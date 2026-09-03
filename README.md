@@ -216,16 +216,7 @@ Se documenta y aplica siempre de la misma manera, usando los valores **acumulado
 - **Lambda**: `sorted(jugadores, key=lambda j: calcular_kda(j), reverse=True)` para el ranking.
 - **Slicing**: `top3 = ranking[:3]` para el informe de Top 3.
 
-24. Informes finales (mínimo 5 → se definen 6)
-
-1. Cuadro actual del torneo: cuartos, semifinales, final y campeón (o fases pendientes).
-2. Ranking completo de jugadores por KDA.
-3. Top 3 de jugadores por KDA.
-4. MVP del torneo (con manejo de empate).
-5. Equipo más letal.
-6. Resumen general: partidos jugados, equipos eliminados, promedio de bajas por jugador, conteo de jugadores con KDA > umbral.
-
-25. Menú principal
+24. Menú principal
 
 1. Registrar equipo (con sus 5 jugadores)
 2. Listar equipos y jugadores
@@ -236,6 +227,17 @@ Se documenta y aplica siempre de la misma manera, usando los valores **acumulado
 7. Consultar rankings (general y Top 3)
 8. Consultar estadísticas e informes (MVP, equipo más letal, resumen)
 9. Salir
+
+
+25. Informes finales (mínimo 5 → se definen 6)
+
+1. Cuadro actual del torneo: cuartos, semifinales, final y campeón (o fases pendientes).
+2. Ranking completo de jugadores por KDA.
+3. Top 3 de jugadores por KDA.
+4. MVP del torneo (con manejo de empate).
+5. Equipo más letal.
+6. Resumen general: partidos jugados, equipos eliminados, promedio de bajas por jugador, conteo de jugadores con KDA > umbral.
+
 
 26. Control de estado del torneo
 
