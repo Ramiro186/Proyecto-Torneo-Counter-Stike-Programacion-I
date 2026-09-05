@@ -6,9 +6,8 @@ N_JUGADORES = 5
 LONGITUD_MIN_NOMBRE = 3
 LONGITUD_MAX_NOMBRE = 20
 
-# Limites de rondas
-RONDAS_MIN = 0
-RONDAS_MAX = 24
+# Regla de marcador simplificada (sin prórrogas): gana quien llega primero a esta cantidad de rondas.
+RONDAS_PARA_GANAR = 13
 
 # Umbral KDA / Clutch
 UMBRAL_KDA = 2.0
@@ -24,12 +23,21 @@ COL_MUERTES = 1
 COL_ASISTENCIAS = 2
 
 
-# Equipos, jugadores, matriz de stats, las llaves y partidos a jugar.
+# Equipos, jugadores, matriz de stats, las llaves.
 equipos = []
 jugadores = []
 matriz_stats = []
-llaves_cuartos = []
-partidos = []
+# Se elimina llaves_cuartos, porque se pisa con otra parte del código
+
+# Partidos se divide en listas individuales
+
+partidos_id = []
+partidos_fase = []
+partidos_equipoA = []
+partidos_equipoB = []
+partidos_rondasA = []
+partidos_rondasB = []
+partidos_jugado = []
 
 # Inscripción, cuadro de enfrentamientos y campeon
 inscripcion_cerrada = False
