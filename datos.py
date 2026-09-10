@@ -21,25 +21,3 @@ NOMBRES_ESTADISTICAS = ("Bajas", "Muertes", "Asistencias")
 COL_BAJAS = 0
 COL_MUERTES = 1
 COL_ASISTENCIAS = 2
-
-
-# Equipos, jugadores, matriz de stats, las llaves.
-equipos = []
-jugadores = []
-matriz_stats = []
-# Se elimina llaves_cuartos, porque se pisa con otra parte del código
-
-# Partidos se divide en listas individuales
-
-partidos_id = []
-partidos_fase = []
-partidos_equipoA = []
-partidos_equipoB = []
-partidos_rondasA = []
-partidos_rondasB = []
-partidos_jugado = []
-
-# Inscripción, cuadro de enfrentamientos y campeon
-inscripcion_cerrada = False
-cuadro_generado = False
-campeon = None
