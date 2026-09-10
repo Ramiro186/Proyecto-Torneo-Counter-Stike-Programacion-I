@@ -165,7 +165,7 @@ def cargar_resultado(partidos_id, partidos_fase, partidos_equipoA, partidos_equi
         partidos_id, partidos_equipoA, partidos_equipoB, partidos_jugado,
         id_partido, rondas_A, rondas_B)
     if not es_valido:
-        return False, mensaje
+        return False, mensaje, ""
 
     # 2) Escribir el marcador en la fila del partido.
     partidos_rondasA[indice] = rondas_A
@@ -178,7 +178,203 @@ def cargar_resultado(partidos_id, partidos_fase, partidos_equipoA, partidos_equi
     ganador = determinar_ganador(partidos_equipoA, partidos_equipoB,
                                  partidos_rondasA, partidos_rondasB, indice)
 
-    # 5) PENDIENTE (punto 15): avanzar_cuadro(...) para colocar al ganador
-    #    en la semifinal o final que corresponda.
+    # 5) Hacer avanzar el cuadro colocando al ganador donde corresponda.
+    #    Si se cerro la final, devuelve el codigo del campeon; si no, "".
+    campeon = avanzar_cuadro(partidos_equipoA, partidos_equipoB, indice, ganador)
 
-    return True, f"Resultado del partido {id_partido} cargado. Ganador: {ganador}."
+    return True, f"Resultado del partido {id_partido} cargado. Ganador: {ganador}.", campeon
+
+# Colocar al ganador de un partido en el partido siguiente que corresponda.
+# Recibe el indice del partido recien cerrado y el codigo del equipo ganador.
+# Devuelve el codigo del campeon si se cerro la final, o "" si todavia no.
+
+
+def avanzar_cuadro(partidos_equipoA, partidos_equipoB, indice, ganador):
+
+    # Ganadores de CUARTOS (indices 0 a 3) van a las SEMIFINALES (4 y 5)
+
+    if indice == 0: #primera partida
+        partidos_equipoA[4] = ganador   # ganador del cuarto 1 -> Semifinal 1, lado A
+
+    elif indice == 1:
+        partidos_equipoB[4] = ganador   # ganador del cuarto 2 -> Semifinal 1, lado B
+
+    elif indice == 2:
+        partidos_equipoA[5] = ganador   # ganador del cuarto 3 -> Semifinal 2, lado A
+
+    elif indice == 3:
+        partidos_equipoB[5] = ganador   # ganador del cuarto 4 -> Semifinal 2, lado B
+
+    # ----- Ganadores de SEMIFINALES (indices 4 y 5) van a la FINAL (6) -----
+    elif indice == 4:
+        partidos_equipoA[6] = ganador   # ganador de Semifinal 1 -> Final, lado A
+
+    elif indice == 5:
+        partidos_equipoB[6] = ganador   # ganador de Semifinal 2 -> Final, lado B
+
+    # Ganador de la FINAL (indice 6) es el campeon
+
+    elif indice == 6:
+        return ganador   # se devuelve el campeon
+
+    # Si el partido cerrado no era la final, todavia no hay campeon.
+
+    return ""
+
+# Indicar si se puede generar el cuadro de cuartos.
+# Solo se permite cuando hay exactamente N_EQUIPOS (8) registrados y el cuadro aun no se genero.
+
+def se_puede_generar_cuadro(equipos, cuadro_generado):
+
+    if cuadro_generado:
+        return False
+    if len(equipos) < N_EQUIPOS:
+        return False
+
+    return True
+
+
+# Indicar si un partido puntual esta listo para cargar su resultado.
+# Un partido esta listo cuando ya tiene definidos sus dos equipos (no estan en "") y todavia no fue jugado.
+
+
+def se_puede_cargar_partido(partidos_equipoA, partidos_equipoB, partidos_jugado, indice):
+
+    # Si el indice no es valido, no se puede.
+
+    if indice < 0 or indice >= len(partidos_jugado):
+        return False
+    
+    # Si ya se jugo, no se puede volver a cargar.
+
+    if partidos_jugado[indice]:
+        return False
+
+    # Si alguno de los dos equipos todavia no esta definido, no se puede.
+
+    if partidos_equipoA[indice] == "" or partidos_equipoB[indice] == "":
+        return False
+    return True
+
+
+# Indicar si ya se cargo al menos un partido con resultado.
+# Sirve para bloquear consultas de informes/estadisticas cuando no hay datos aun (lo pidio la profe: no consultar MVP, rankings, etc. sin partidos cargados).
+
+def hay_partidos_jugados(partidos_jugado):
+
+    for jugado in partidos_jugado:
+        if jugado:
+            return True
+
+
+    return False
+
+
+# Pide un numero entero por consola de forma segura.
+# Si el usuario escribe algo que no es un numero entero, avisa y vuelve a pedir.
+# No deja avanzar hasta recibir un entero valido.
+
+def pedir_entero(mensaje):
+    seguir = True
+    numero = 0
+    while seguir == True:
+        texto = input(mensaje)
+        # strip() saca espacios de los costados; lstrip("-") saca un signo menos inicial
+        # para poder aceptar negativos y que isdigit los reconozca.
+        limpio = texto.strip()
+        if limpio.lstrip("-").isdigit():
+            numero = int(limpio)
+            seguir = False
+        else:
+            print("Entrada invalida: escribi un numero entero.")
+
+    return numero
+
+
+
+# Muestra el estado completo del cuadro del torneo.
+# Recorre las 7 listas paralelas por indice y arma una linea por partido.
+# Si el partido ya se jugo, muestra el marcador; si no, lo marca como pendiente.
+
+def mostrar_cuadro(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
+                   partidos_rondasA, partidos_rondasB, partidos_jugado, campeon):
+    
+    print("----- CUADRO DEL TORNEO -----")
+
+    for i in range(len(partidos_id)):
+        # Si un equipo todavia no esta definido, se muestra "?" en vez de vacio.
+        if partidos_equipoA[i] == "":
+            equipoA = "?"
+        else:
+            equipoA = partidos_equipoA[i]
+
+        if partidos_equipoB[i] == "":
+            equipoB = "?"
+        else:
+            equipoB = partidos_equipoB[i]
+
+        # Arma la parte del marcador segun si el partido ya se jugo o no.
+        if partidos_jugado[i]:
+            marcador = f"{partidos_rondasA[i]} - {partidos_rondasB[i]}"
+        else:
+            marcador = "pendiente"
+
+        # Linea final del partido.
+        print(f"Partido {partidos_id[i]} ({partidos_fase[i]}): {equipoA} vs {equipoB}  [{marcador}]")
+
+    # Al final, el estado del campeon.
+    if campeon == "":
+        print("Campeon: aun no definido.")
+    else:
+        print(f"Campeon del torneo: {campeon}")
+
+
+# Devuelve el INDICE del equipo cuyo codigo coincide (case-insensitive, normalizado).
+# Si no existe, devuelve -1.
+def buscar_indice_equipo(equipos, codigo_buscado):
+    # Normalizamos: sin espacios de los costados y en mayusculas, para comparar parejo.
+    codigo_normalizado = codigo_buscado.strip().upper()
+    for i in range(len(equipos)):
+        # equipos[i] es la tupla (codigo_equipo, nombre_equipo); [0] es el codigo.
+        if equipos[i][0].strip().upper() == codigo_normalizado:
+            return i
+    return -1
+
+
+# Muestra los datos de un equipo (por su codigo): nombre, jugadores y partidos donde aparece.
+# Recibe las estructuras necesarias y el codigo que ingreso el usuario.
+def mostrar_equipo(equipos, jugadores, partidos_id, partidos_fase,
+                   partidos_equipoA, partidos_equipoB, codigo_buscado):
+    indice = buscar_indice_equipo(equipos, codigo_buscado)
+
+    # Si no se encontro, avisamos y cortamos.
+    if indice == -1:
+        print(f"No existe un equipo con codigo '{codigo_buscado}'.")
+        return
+
+    # Datos basicos del equipo.
+    codigo_equipo = equipos[indice][0]
+    nombre_equipo = equipos[indice][1]
+    print()
+    print(f"----- EQUIPO {codigo_equipo}: {nombre_equipo} -----")
+
+    # Jugadores del equipo: recorremos la lista de jugadores y filtramos por codigo_equipo.
+    print("Jugadores:")
+    hay_jugadores = False
+    for jugador in jugadores:
+        # jugador es la tupla (codigo_jugador, nickname, codigo_equipo); [2] es su equipo.
+        if jugador[2] == codigo_equipo:
+            print(f"  - {jugador[0]}: {jugador[1]}")
+            hay_jugadores = True
+    if hay_jugadores == False:
+        print("  (sin jugadores registrados)")
+
+    # Partidos donde aparece este equipo (como A o como B).
+    print("Partidos en el cuadro:")
+    aparece = False
+    for i in range(len(partidos_id)):
+        if partidos_equipoA[i] == codigo_equipo or partidos_equipoB[i] == codigo_equipo:
+            print(f"  - Partido {partidos_id[i]} ({partidos_fase[i]})")
+            aparece = True
+    if aparece == False:
+        print("  (todavia no aparece en ningun partido)")
