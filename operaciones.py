@@ -1,5 +1,5 @@
 import random
-import re
+import re # Revisar
 from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH, COL_BAJAS, COL_MUERTES, COL_ASISTENCIAS, NOMBRES_ESTADISTICAS, LONGITUD_MIN_NOMBRE, LONGITUD_MAX_NOMBRE, N_JUGADORES
 
 # ------------------------------------------------------------
@@ -9,7 +9,7 @@ from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH
 def normalizar_cadena(cadena):
     return cadena.strip().upper()
 
-def es_nombre_valido(nombre):
+def es_nombre_valido(nombre): # Revisar
     if not nombre or nombre.isspace():
         return False
     if not (LONGITUD_MIN_NOMBRE <= len(nombre) <= LONGITUD_MAX_NOMBRE):
@@ -36,7 +36,7 @@ def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, ins
         print(f"Error: Nombre de equipo invalido ({LONGITUD_MIN_NOMBRE}-{LONGITUD_MAX_NOMBRE} caracteres, letras, numeros, sin espacios multiples).")
         return
         
-    for _, nombre in equipos:
+    for codigo, nombre in equipos:
         if normalizar_cadena(nombre) == nombre_norm:
             print("Error: El equipo ya se encuentra registrado.")
             return
@@ -53,15 +53,15 @@ def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, ins
             print("Error: Username invalido.")
             continue
             
-        duplicado_global = any(normalizar_cadena(j[1]) == user_norm for j in jugadores)
-        duplicado_local = any(normalizar_cadena(j[1]) == user_norm for j in jugadores_temporales)
+        duplicado_global = any(normalizar_cadena(j[1]) == user_norm for j in jugadores) # Revisar
+        duplicado_local = any(normalizar_cadena(j[1]) == user_norm for j in jugadores_temporales) # Revisar
         
         if duplicado_global or duplicado_local:
             print("Error: Ese jugador ya esta registrado en el torneo o en este equipo.")
             continue
             
         num_jugador_actual = len(jugadores) + len(jugadores_temporales) + 1
-        cod_jugador = f"J{num_jugador_actual:02d}"
+        cod_jugador = "J" + str(num_jugador_actual).zfill(2) # Corrección en base a lo visto en clase
         jugadores_temporales.append((cod_jugador, username, codigo_equipo))
         print(f"Jugador '{username}' aceptado.")
         
