@@ -1,5 +1,5 @@
 import random
-from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR
+from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH, COL_BAJAS, COL_MUERTES, COL_ASISTENCIAS, NOMBRES_ESTADISTICAS
 
 # La siguiente función, agrega un partido al final de todas las listas paralelas de una sola vez, manteniendo el indice alineado entre ellas.
 # El Marcador arranca en -1 (no cargado) y jugado en False
@@ -378,3 +378,356 @@ def mostrar_equipo(equipos, jugadores, partidos_id, partidos_fase,
             aparece = True
     if aparece == False:
         print("  (todavia no aparece en ningun partido)")
+
+# Agrega la fila de estadisticas de UN jugador nuevo.
+# Debe llamarse UNA VEZ por cada jugador que se agrega a la lista jugadores,
+# inmediatamente despues del append del jugador (lo hace la Parte A).
+# Asi la fila i de matriz_stats corresponde siempre al jugador i.
+def agregar_fila_stats(matriz_stats, partidos_por_jugador):
+    matriz_stats.append([0, 0, 0])   # [bajas, muertes, asistencias] acumuladas
+    partidos_por_jugador.append(0)   # cuantos partidos disputo ese jugador
+ 
+ 
+# ------------------------------------------------------------
+# 2) Normalizacion y busquedas
+# ------------------------------------------------------------
+ 
+# Deja un texto listo para comparar: sin espacios de los costados y en minusculas.
+def normalizar_texto(texto):
+    return texto.strip().lower()
+ 
+ 
+# Devuelve el INDICE del jugador cuyo codigo O nickname coincide.
+# La comparacion es case-insensitive y normalizada. Si no existe, devuelve -1.
+def buscar_indice_jugador(jugadores, texto_buscado):
+    buscado = normalizar_texto(texto_buscado)
+    for i in range(len(jugadores)):
+        codigo = normalizar_texto(jugadores[i][0])
+        nickname = normalizar_texto(jugadores[i][1])
+        if codigo == buscado or nickname == buscado:
+            return i
+    return -1
+ 
+ 
+# Devuelve una LISTA DE INDICES de los jugadores que pertenecen a un equipo.
+def indices_de_equipo(jugadores, codigo_equipo):
+    indices = []
+    for i in range(len(jugadores)):
+        if jugadores[i][2] == codigo_equipo:
+            indices.append(i)
+    return indices
+ 
+ 
+# ------------------------------------------------------------
+# 3) Carga de estadisticas de un partido (punto 10)
+# ------------------------------------------------------------
+ 
+# Pide un numero entero mayor o igual a cero. Reutiliza pedir_entero de la Parte B.
+def pedir_estadistica(mensaje):
+    seguir = True
+    valor = 0
+    while seguir == True:
+        valor = pedir_entero(mensaje)
+        if valor < 0:
+            print("Valor invalido: no puede ser negativo.")
+        else:
+            seguir = False
+    return valor
+ 
+ 
+# Carga las estadisticas de los 5 jugadores de UN equipo y las ACUMULA en la matriz.
+def cargar_stats_de_equipo(jugadores, matriz_stats, partidos_por_jugador, codigo_equipo):
+    indices = indices_de_equipo(jugadores, codigo_equipo)
+    print()
+    print(f"--- Estadisticas del equipo {codigo_equipo} ---")
+    for i in indices:
+        print(f"Jugador {jugadores[i][0]} ({jugadores[i][1]}):")
+        bajas = pedir_estadistica("  Bajas: ")
+        muertes = pedir_estadistica("  Muertes: ")
+        asistencias = pedir_estadistica("  Asistencias: ")
+ 
+        # Se SUMAN a lo que ya tenia acumulado del torneo (no se reemplaza).
+        matriz_stats[i][COL_BAJAS] = matriz_stats[i][COL_BAJAS] + bajas
+        matriz_stats[i][COL_MUERTES] = matriz_stats[i][COL_MUERTES] + muertes
+        matriz_stats[i][COL_ASISTENCIAS] = matriz_stats[i][COL_ASISTENCIAS] + asistencias
+ 
+        # Se registra que este jugador disputo un partido mas.
+        partidos_por_jugador[i] = partidos_por_jugador[i] + 1
+ 
+ 
+# Carga las estadisticas de los 10 jugadores de un partido (5 por equipo).
+# Se llama DESPUES de que cargar_resultado devolvio True.
+def cargar_estadisticas_partido(jugadores, matriz_stats, partidos_por_jugador,
+                                codigo_equipoA, codigo_equipoB):
+    cargar_stats_de_equipo(jugadores, matriz_stats, partidos_por_jugador, codigo_equipoA)
+    cargar_stats_de_equipo(jugadores, matriz_stats, partidos_por_jugador, codigo_equipoB)
+    print()
+    print("Estadisticas del partido cargadas correctamente.")
+ 
+ 
+# ------------------------------------------------------------
+# 4) KDA (punto 16)
+# ------------------------------------------------------------
+ 
+# KDA = (bajas + asistencias) / muertes   si muertes > 0
+# KDA = bajas + asistencias               si muertes == 0
+def calcular_kda(matriz_stats, indice):
+    bajas = matriz_stats[indice][COL_BAJAS]
+    muertes = matriz_stats[indice][COL_MUERTES]
+    asistencias = matriz_stats[indice][COL_ASISTENCIAS]
+ 
+    if muertes > 0:
+        return (bajas + asistencias) / muertes
+    else:
+        return bajas + asistencias
+ 
+ 
+# Indica si el jugador disputo al menos un partido.
+def jugo_algun_partido(partidos_por_jugador, indice):
+    return partidos_por_jugador[indice] > 0
+ 
+ 
+# Jugador clutch: KDA acumulado mayor o igual a UMBRAL_CLUTCH (punto 21).
+def es_clutch(kda):
+    return kda >= UMBRAL_CLUTCH
+ 
+ 
+# ------------------------------------------------------------
+# 5) Ranking (comprehension + lambda + slicing)  (punto 23)
+# ------------------------------------------------------------
+ 
+# Construye el ranking de jugadores por KDA, de mayor a menor.
+# Solo incluye a los que disputaron al menos un partido.
+# Cada fila del ranking es: [kda, codigo_jugador, nickname, codigo_equipo]
+def construir_ranking(jugadores, matriz_stats, partidos_por_jugador):
+    # COMPREHENSION: arma la lista de KDA de todos los jugadores.
+    kdas = [calcular_kda(matriz_stats, i) for i in range(len(jugadores))]
+ 
+    ranking = []
+    for i in range(len(jugadores)):
+        if jugo_algun_partido(partidos_por_jugador, i):
+            ranking.append([kdas[i], jugadores[i][0], jugadores[i][1], jugadores[i][2]])
+ 
+    # LAMBDA: ordena por el KDA (posicion 0 de cada fila), de mayor a menor.
+    ranking.sort(key=lambda fila: fila[0], reverse=True)
+    return ranking
+ 
+ 
+# Informe 2: ranking completo de jugadores por KDA.
+def mostrar_ranking_completo(ranking):
+    print()
+    print("----- RANKING DE JUGADORES POR KDA -----")
+    if len(ranking) == 0:
+        print("Todavia no hay jugadores con partidos disputados.")
+        return
+ 
+    posicion = 1
+    for fila in ranking:
+        kda = fila[0]
+        if es_clutch(kda):
+            marca = "  [CLUTCH]"
+        else:
+            marca = ""
+        print(f"{posicion}. {fila[2]} ({fila[1]}) - equipo {fila[3]} - KDA: {kda:.2f}{marca}")
+        posicion = posicion + 1
+ 
+ 
+# Informe 3: Top 3 por KDA. Usa SLICING.
+def mostrar_top3(ranking):
+    print()
+    print("----- TOP 3 DE JUGADORES POR KDA -----")
+    if len(ranking) == 0:
+        print("Todavia no hay jugadores con partidos disputados.")
+        return
+ 
+    top3 = ranking[:3]   # SLICING
+    posicion = 1
+    for fila in top3:
+        print(f"{posicion}. {fila[2]} ({fila[1]}) - KDA: {fila[0]:.2f}")
+        posicion = posicion + 1
+ 
+ 
+# ------------------------------------------------------------
+# 6) MVP, equipo mas letal, promedio y conteo (puntos 17 a 20)
+# ------------------------------------------------------------
+ 
+# Informe 4: MVP del torneo = jugador con mayor KDA acumulado.
+# Si hay empate en el KDA maximo, se informan TODOS (punto 17).
+def mostrar_mvp(ranking):
+    print()
+    print("----- MVP DEL TORNEO -----")
+    if len(ranking) == 0:
+        print("Todavia no hay jugadores con partidos disputados.")
+        return
+ 
+    # El ranking ya esta ordenado de mayor a menor: el maximo esta en la posicion 0.
+    kda_maximo = ranking[0][0]
+ 
+    empatados = []
+    for fila in ranking:
+        if fila[0] == kda_maximo:
+            empatados.append(fila)
+ 
+    if len(empatados) == 1:
+        fila = empatados[0]
+        print(f"MVP: {fila[2]} ({fila[1]}) - equipo {fila[3]} - KDA: {fila[0]:.2f}")
+    else:
+        print(f"Hay {len(empatados)} jugadores empatados con KDA {kda_maximo:.2f}:")
+        for fila in empatados:
+            print(f"  - {fila[2]} ({fila[1]}) - equipo {fila[3]}")
+ 
+ 
+# Devuelve el total de bajas acumuladas por los jugadores de un equipo.
+def bajas_de_equipo(jugadores, matriz_stats, codigo_equipo):
+    total = 0
+    for i in indices_de_equipo(jugadores, codigo_equipo):
+        total = total + matriz_stats[i][COL_BAJAS]
+    return total
+ 
+ 
+# Informe 5: equipo mas letal = el que acumula mas bajas en total (punto 18).
+def mostrar_equipo_mas_letal(equipos, jugadores, matriz_stats):
+    print()
+    print("----- EQUIPO MAS LETAL -----")
+    if len(equipos) == 0:
+        print("Todavia no hay equipos registrados.")
+        return
+ 
+    mejor_total = -1
+    empatados = []
+ 
+    for equipo in equipos:
+        codigo = equipo[0]
+        nombre = equipo[1]
+        total = bajas_de_equipo(jugadores, matriz_stats, codigo)
+ 
+        if total > mejor_total:
+            mejor_total = total
+            empatados = [[codigo, nombre]]
+        elif total == mejor_total:
+            empatados.append([codigo, nombre])
+ 
+    if mejor_total <= 0:
+        print("Todavia no hay bajas cargadas en el torneo.")
+        return
+ 
+    if len(empatados) == 1:
+        print(f"{empatados[0][1]} ({empatados[0][0]}) con {mejor_total} bajas.")
+    else:
+        print(f"Hay {len(empatados)} equipos empatados con {mejor_total} bajas:")
+        for fila in empatados:
+            print(f"  - {fila[1]} ({fila[0]})")
+ 
+ 
+# Punto 19: promedio de bajas por jugador, contando solo a los que jugaron.
+def promedio_bajas_por_jugador(matriz_stats, partidos_por_jugador):
+    total_bajas = 0
+    cantidad = 0
+    for i in range(len(matriz_stats)):
+        if jugo_algun_partido(partidos_por_jugador, i):
+            total_bajas = total_bajas + matriz_stats[i][COL_BAJAS]
+            cantidad = cantidad + 1
+ 
+    if cantidad == 0:
+        return 0.0
+    return total_bajas / cantidad
+ 
+ 
+# Punto 20: cantidad de jugadores con KDA superior al umbral configurado.
+def contar_kda_superior(matriz_stats, partidos_por_jugador, umbral):
+    cantidad = 0
+    for i in range(len(matriz_stats)):
+        if jugo_algun_partido(partidos_por_jugador, i):
+            if calcular_kda(matriz_stats, i) > umbral:
+                cantidad = cantidad + 1
+    return cantidad
+ 
+ 
+# ------------------------------------------------------------
+# 7) Busqueda de jugador (punto 22, menu 6)
+# ------------------------------------------------------------
+ 
+# Muestra la ficha completa de un jugador buscado por codigo o nickname.
+def mostrar_jugador(jugadores, matriz_stats, partidos_por_jugador, texto_buscado):
+    indice = buscar_indice_jugador(jugadores, texto_buscado)
+ 
+    if indice == -1:
+        print(f"No existe un jugador con codigo o nickname '{texto_buscado}'.")
+        return
+ 
+    codigo = jugadores[indice][0]
+    nickname = jugadores[indice][1]
+    codigo_equipo = jugadores[indice][2]
+ 
+    print()
+    print(f"----- JUGADOR {codigo}: {nickname} -----")
+    print(f"Equipo: {codigo_equipo}")
+    print(f"Partidos disputados: {partidos_por_jugador[indice]}")
+    print(f"{NOMBRES_ESTADISTICAS[COL_BAJAS]}: {matriz_stats[indice][COL_BAJAS]}")
+    print(f"{NOMBRES_ESTADISTICAS[COL_MUERTES]}: {matriz_stats[indice][COL_MUERTES]}")
+    print(f"{NOMBRES_ESTADISTICAS[COL_ASISTENCIAS]}: {matriz_stats[indice][COL_ASISTENCIAS]}")
+ 
+    if jugo_algun_partido(partidos_por_jugador, indice):
+        kda = calcular_kda(matriz_stats, indice)
+        print(f"KDA acumulado: {kda:.2f}")
+        if es_clutch(kda):
+            print("Condicion: JUGADOR CLUTCH (KDA >= 3.0)")
+    else:
+        print("KDA acumulado: sin partidos disputados.")
+ 
+ 
+# ------------------------------------------------------------
+# 8) Resumen general (informe 6)
+# ------------------------------------------------------------
+ 
+# Cuenta cuantos partidos ya tienen resultado cargado.
+def contar_partidos_jugados(partidos_jugado):
+    cantidad = 0
+    for jugado in partidos_jugado:
+        if jugado:
+            cantidad = cantidad + 1
+    return cantidad
+ 
+ 
+# Devuelve la lista de codigos de equipos que ya perdieron un partido (eliminados).
+def equipos_eliminados(partidos_equipoA, partidos_equipoB,
+                       partidos_rondasA, partidos_rondasB, partidos_jugado):
+    eliminados = []
+    for i in range(len(partidos_jugado)):
+        if partidos_jugado[i]:
+            if partidos_rondasA[i] > partidos_rondasB[i]:
+                perdedor = partidos_equipoB[i]
+            else:
+                perdedor = partidos_equipoA[i]
+            eliminados.append(perdedor)
+    return eliminados
+ 
+ 
+# Informe 6: resumen general del torneo.
+def mostrar_resumen_general(equipos, jugadores, matriz_stats, partidos_por_jugador,
+                            partidos_equipoA, partidos_equipoB,
+                            partidos_rondasA, partidos_rondasB, partidos_jugado):
+    print()
+    print("----- RESUMEN GENERAL DEL TORNEO -----")
+ 
+    jugados = contar_partidos_jugados(partidos_jugado)
+    print(f"Partidos jugados: {jugados} de {len(partidos_jugado)}")
+ 
+    eliminados = equipos_eliminados(partidos_equipoA, partidos_equipoB,
+                                    partidos_rondasA, partidos_rondasB, partidos_jugado)
+    if len(eliminados) == 0:
+        print("Equipos eliminados: ninguno todavia.")
+    else:
+        print(f"Equipos eliminados ({len(eliminados)}):")
+        for codigo in eliminados:
+            indice_equipo = buscar_indice_equipo(equipos, codigo)
+            if indice_equipo == -1:
+                print(f"  - {codigo}")
+            else:
+                print(f"  - {equipos[indice_equipo][1]} ({codigo})")
+ 
+    promedio = promedio_bajas_por_jugador(matriz_stats, partidos_por_jugador)
+    print(f"Promedio de bajas por jugador: {promedio:.2f}")
+ 
+    cantidad = contar_kda_superior(matriz_stats, partidos_por_jugador, UMBRAL_KDA)
+    print(f"Jugadores con KDA mayor a {UMBRAL_KDA}: {cantidad}")
