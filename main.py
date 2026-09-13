@@ -2,7 +2,7 @@ import operaciones
 import datos
  
  
-# Funcion principal: crea todas las estructuras en memoria y coordina el menu.
+# Funcion principal:
 def main():
     # ----- Estructuras iniciales de inscripcion -----
     equipos = []          # lista de tuplas (codigo_equipo, nombre_equipo)
@@ -48,10 +48,10 @@ def main():
         opcion = operaciones.pedir_entero("Elegi una opcion: ")
  
         if opcion == 1:
-            print("[Opcion 1] La resuelve Persona A (inscripcion).")
+            operaciones.registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, inscripcion_cerrada)
  
         elif opcion == 2:
-            print("[Opcion 2] La resuelve Persona A (inscripcion).")
+            operaciones.listar_equipos_jugadores(equipos, jugadores)
  
         elif opcion == 3:
  

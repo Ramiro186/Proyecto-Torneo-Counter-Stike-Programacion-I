@@ -1,5 +1,93 @@
 import random
-from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH, COL_BAJAS, COL_MUERTES, COL_ASISTENCIAS, NOMBRES_ESTADISTICAS
+import re
+from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH, COL_BAJAS, COL_MUERTES, COL_ASISTENCIAS, NOMBRES_ESTADISTICAS, LONGITUD_MIN_NOMBRE, LONGITUD_MAX_NOMBRE
+
+# ------------------------------------------------------------
+# 1) Inscripcion y Validaciones (Opciones 1 y 2 - Persona A)
+# ------------------------------------------------------------
+
+def normalizar_cadena(cadena):
+    return cadena.strip().upper()
+
+def es_nombre_valido(nombre):
+    if not nombre or nombre.isspace():
+        return False
+    if not (LONGITUD_MIN_NOMBRE <= len(nombre) <= LONGITUD_MAX_NOMBRE):
+        return False
+    if not re.match(r'^[A-Za-z0-9_]+$', nombre):
+        return False
+    if not re.search(r'[A-Za-z]', nombre):
+        return False
+    return True
+
+def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, inscripcion_cerrada):
+    if inscripcion_cerrada:
+        print("La inscripcion esta cerrada. El cuadro del torneo ya fue generado.")
+        return
+        
+    if len(equipos) >= N_EQUIPOS:
+        print(f"Inscripcion cerrada: Ya se registraron los {N_EQUIPOS} equipos permitidos.")
+        return
+
+    nombre_equipo = input("Ingrese el nombre del equipo: ")
+    nombre_norm = normalizar_cadena(nombre_equipo)
+    
+    if not es_nombre_valido(nombre_norm):
+        print(f"Error: Nombre de equipo invalido ({LONGITUD_MIN_NOMBRE}-{LONGITUD_MAX_NOMBRE} caracteres, letras, numeros, sin espacios multiples).")
+        return
+        
+    for _, nombre in equipos:
+        if normalizar_cadena(nombre) == nombre_norm:
+            print("Error: El equipo ya se encuentra registrado.")
+            return
+            
+    codigo_equipo = f"E{len(equipos) + 1}"
+    jugadores_temporales = []
+    
+    print(f"\n--- Registrando jugadores para {nombre_equipo} ---")
+    while len(jugadores_temporales) < 5:
+        username = input(f"Ingrese el username del jugador {len(jugadores_temporales) + 1}/5: ")
+        user_norm = normalizar_cadena(username)
+        
+        if not es_nombre_valido(user_norm):
+            print("Error: Username invalido.")
+            continue
+            
+        duplicado_global = any(normalizar_cadena(j[1]) == user_norm for j in jugadores)
+        duplicado_local = any(normalizar_cadena(j[1]) == user_norm for j in jugadores_temporales)
+        
+        if duplicado_global or duplicado_local:
+            print("Error: Ese jugador ya esta registrado en el torneo o en este equipo.")
+            continue
+            
+        num_jugador_actual = len(jugadores) + len(jugadores_temporales) + 1
+        cod_jugador = f"J{num_jugador_actual:02d}"
+        jugadores_temporales.append((cod_jugador, username, codigo_equipo))
+        print(f"Jugador '{username}' aceptado.")
+        
+    # Guardamos el equipo y los jugadores
+    equipos.append((codigo_equipo, nombre_equipo))
+    
+    for jug in jugadores_temporales:
+        jugadores.append(jug)
+        # LLAMADA CLAVE: Sincronizamos las matrices de estadisticas
+        agregar_fila_stats(matriz_stats, partidos_por_jugador)
+        
+    print(f"\nAlta exitosa! El equipo '{nombre_equipo}' y sus 5 jugadores estan listos.\n")
+
+def listar_equipos_jugadores(equipos, jugadores):
+    if not equipos:
+        print("No hay equipos registrados actualmente.")
+        return
+        
+    print("\n----- LISTADO DE EQUIPOS Y JUGADORES -----")
+    for cod_eq, nom_eq in equipos:
+        print(f"\n[{cod_eq}] Equipo: {nom_eq}")
+        jugadores_del_equipo = [j for j in jugadores if j[2] == cod_eq]
+        for cod_j, username, _ in jugadores_del_equipo:
+            print(f"  - {cod_j}: {username}")
+    print("-" * 42)
+
 
 # La siguiente función, agrega un partido al final de todas las listas paralelas de una sola vez, manteniendo el indice alineado entre ellas.
 # El Marcador arranca en -1 (no cargado) y jugado en False
