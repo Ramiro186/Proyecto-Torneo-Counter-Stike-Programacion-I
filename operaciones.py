@@ -61,19 +61,17 @@ def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, ins
             print("Error: Username invalido.")
             continue
             
-        # Reemplazo de any() - Busqueda de duplicado global
+        # Busqueda de duplicado global sin break ni any()
         duplicado_global = False
         for j in jugadores:
             if normalizar_cadena(j[1]) == user_norm:
                 duplicado_global = True
-                break
                 
-        # Reemplazo de any() - Busqueda de duplicado local
+        # Busqueda de duplicado local sin break ni any()
         duplicado_local = False
         for j in jugadores_temporales:
             if normalizar_cadena(j[1]) == user_norm:
                 duplicado_local = True
-                break
         
         if duplicado_global or duplicado_local:
             print("Error: Ese jugador ya esta registrado en el torneo o en este equipo.")
