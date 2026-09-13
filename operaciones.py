@@ -1,5 +1,4 @@
 import random
-import re # Revisar
 from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH, COL_BAJAS, COL_MUERTES, COL_ASISTENCIAS, NOMBRES_ESTADISTICAS, LONGITUD_MIN_NOMBRE, LONGITUD_MAX_NOMBRE, N_JUGADORES
 
 # ------------------------------------------------------------
@@ -9,15 +8,24 @@ from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH
 def normalizar_cadena(cadena):
     return cadena.strip().upper()
 
-def es_nombre_valido(nombre): # Revisar
+def es_nombre_valido(nombre):
     if not nombre or nombre.isspace():
         return False
     if not (LONGITUD_MIN_NOMBRE <= len(nombre) <= LONGITUD_MAX_NOMBRE):
         return False
-    if not re.match(r'^[A-Za-z0-9_]+$', nombre):
+        
+    tiene_letra = False
+    for caracter in nombre:
+        # Si el caracter no es letra, ni numero, ni guion bajo, es invalido
+        if not caracter.isalnum() and caracter != '_':
+            return False
+        # Chequeamos que tenga al menos una letra (no puede ser puro numero)
+        if caracter.isalpha():
+            tiene_letra = True
+            
+    if not tiene_letra:
         return False
-    if not re.search(r'[A-Za-z]', nombre):
-        return False
+        
     return True
 
 def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, inscripcion_cerrada):
@@ -53,15 +61,26 @@ def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, ins
             print("Error: Username invalido.")
             continue
             
-        duplicado_global = any(normalizar_cadena(j[1]) == user_norm for j in jugadores) # Revisar
-        duplicado_local = any(normalizar_cadena(j[1]) == user_norm for j in jugadores_temporales) # Revisar
+        # Reemplazo de any() - Busqueda de duplicado global
+        duplicado_global = False
+        for j in jugadores:
+            if normalizar_cadena(j[1]) == user_norm:
+                duplicado_global = True
+                break
+                
+        # Reemplazo de any() - Busqueda de duplicado local
+        duplicado_local = False
+        for j in jugadores_temporales:
+            if normalizar_cadena(j[1]) == user_norm:
+                duplicado_local = True
+                break
         
         if duplicado_global or duplicado_local:
             print("Error: Ese jugador ya esta registrado en el torneo o en este equipo.")
             continue
             
         num_jugador_actual = len(jugadores) + len(jugadores_temporales) + 1
-        cod_jugador = "J" + str(num_jugador_actual).zfill(2) # Corrección en base a lo visto en clase
+        cod_jugador = "J" + str(num_jugador_actual).zfill(2)
         jugadores_temporales.append((cod_jugador, username, codigo_equipo))
         print(f"Jugador '{username}' aceptado.")
         
