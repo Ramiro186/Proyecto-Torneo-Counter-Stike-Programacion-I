@@ -14,7 +14,7 @@ def main():
     # porque la matriz de estadisticas sola no alcanza para eso.
     partidos_por_jugador = []
  
-    # ----- Partidos: 7 listas paralelas (el indice i identifica al MISMO partido) -----
+    # ----- Partidos: 7 listas paralelas (el indice i identifica al MISMO partido) ----- Esto para mantener las estructuras homogéneas
     partidos_id = []        # int: 1..7
     partidos_fase = []      # str: una de FASES
     partidos_equipoA = []   # str: codigo_equipo, o "" si aun no se conoce
@@ -25,9 +25,9 @@ def main():
  
     # Banderas de estado del torneo
  
-    inscripcion_cerrada = False
+    inscripcion_cerrada = False # Arranca en Falso
     cuadro_generado = False
-    campeon = ""
+    campeon = "" # Arranca vacío porque no hay campeón
  
     # Menú principal
  
@@ -96,7 +96,7 @@ def main():
                 # Guardamos el indice ANTES de cargar, para saber que equipos
                 # jugaron ese partido y a quien pedirle las estadisticas.
                 indice = operaciones.buscar_indice_partido(partidos_id, id_partido)
-                if indice == -1:
+                if indice == -1: # Validación en caso de partido inexistente 
                     codigo_equipoA = ""
                     codigo_equipoB = ""
                 else:

@@ -50,7 +50,7 @@ def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, ins
             return
             
     codigo_equipo = f"E{len(equipos) + 1}"
-    jugadores_temporales = []
+    jugadores_temporales = [] # Hasta que los 5 jugadores no sean válidos, se guardan acá
     
     print(f"\n--- Registrando jugadores para {nombre_equipo} ---")
     while len(jugadores_temporales) < 5:
@@ -88,7 +88,7 @@ def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, ins
     for jug in jugadores_temporales:
         jugadores.append(jug)
         # LLAMADA CLAVE: Sincronizamos las matrices de estadisticas
-        agregar_fila_stats(matriz_stats, partidos_por_jugador)
+        agregar_fila_stats(matriz_stats, partidos_por_jugador) # Creación de estadisticas individuales a cada jugador
         
     print(f"\nAlta exitosa! El equipo '{nombre_equipo}' y sus 5 jugadores estan listos.\n")
 

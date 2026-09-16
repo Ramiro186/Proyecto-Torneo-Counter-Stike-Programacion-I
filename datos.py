@@ -17,7 +17,7 @@ UMBRAL_CLUTCH = 3.0
 FASES = ("Cuartos de Final", "Semifinal", "Final")
 
 # KDA, contador.
-NOMBRES_ESTADISTICAS = ("Bajas", "Muertes", "Asistencias")
+NOMBRES_ESTADISTICAS = ("Bajas", "Muertes", "Asistencias") # Se usaron para no hardcodear los valores a la hora de llamar a las columnas de la matriz
 COL_BAJAS = 0
 COL_MUERTES = 1
 COL_ASISTENCIAS = 2
