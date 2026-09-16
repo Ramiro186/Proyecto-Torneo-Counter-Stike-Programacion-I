@@ -379,7 +379,7 @@ def hay_partidos_jugados(partidos_jugado):
 # Si el usuario escribe algo que no es un numero entero, avisa y vuelve a pedir.
 # No deja avanzar hasta recibir un entero valido.
 
-def pedir_entero(mensaje):
+def pedir_entero(mensaje): # Validación a la hora de ingresar cualquier número
     seguir = True
     numero = 0
     while seguir == True:
@@ -561,7 +561,7 @@ def cargar_stats_de_equipo(jugadores, matriz_stats, partidos_por_jugador, codigo
     print()
     print(f"--- Estadisticas del equipo {codigo_equipo} ---")
     for i in indices:
-        print(f"Jugador {jugadores[i][0]} ({jugadores[i][1]}):")
+        print(f"Jugador {jugadores[i][0]} ({jugadores[i][1]}):") # (0=código, 1=nick, 2=equipo).
         bajas = pedir_estadistica("  Bajas: ")
         muertes = pedir_estadistica("  Muertes: ")
         asistencias = pedir_estadistica("  Asistencias: ")
@@ -629,7 +629,7 @@ def construir_ranking(jugadores, matriz_stats, partidos_por_jugador):
             ranking.append([kdas[i], jugadores[i][0], jugadores[i][1], jugadores[i][2]])
 
     # LAMBDA: ordena por el KDA (posicion 0 de cada fila), de mayor a menor.
-    ranking.sort(key=lambda fila: fila[0], reverse=True)
+    ranking.sort(key=lambda fila: fila[0], reverse=True) # lambda fila: fila[0] es una mini-función que recibe una fila del ranking (fila) y devuelve su primer elemento (fila[0], que es el KDA).
     return ranking
 
 
@@ -748,7 +748,7 @@ def promedio_bajas_por_jugador(matriz_stats, partidos_por_jugador):
             total_bajas = total_bajas + matriz_stats[i][COL_BAJAS]
             cantidad = cantidad + 1
 
-    if cantidad == 0:
+    if cantidad == 0: # Se utiliza para evitar que el programa se rompa por dividir por cero
         return 0.0
     return total_bajas / cantidad
 
