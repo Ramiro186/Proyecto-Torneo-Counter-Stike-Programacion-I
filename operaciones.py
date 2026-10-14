@@ -1,119 +1,145 @@
+# ------------------------------------------------------------
+# operaciones.py - Logica del torneo
+# ------------------------------------------------------------
+# Validaciones, busquedas, calculos e informes.
+# Ninguna funcion de este modulo usa input() ni print():
+# devuelven valores (o mensajes como texto) y main.py se encarga de mostrarlos.
+
 import random
-from datos import N_EQUIPOS, FASES, RONDAS_PARA_GANAR, UMBRAL_KDA, UMBRAL_CLUTCH, COL_BAJAS, COL_MUERTES, COL_ASISTENCIAS, NOMBRES_ESTADISTICAS, LONGITUD_MIN_NOMBRE, LONGITUD_MAX_NOMBRE, N_JUGADORES
 
-# ------------------------------------------------------------
-# 1) Inscripcion y Validaciones (Opciones 1 y 2 - Persona A)
-# ------------------------------------------------------------
 
-def normalizar_cadena(cadena):
-    return cadena.strip().upper()
+# ============================================================
+# 1) Normalizacion y validacion de nombres (punto 5)
+# ============================================================
 
-def es_nombre_valido(nombre):
-    if not nombre or nombre.isspace():
-        return False
-    if not (LONGITUD_MIN_NOMBRE <= len(nombre) <= LONGITUD_MAX_NOMBRE):
-        return False
-        
-    tiene_letra = False
-    for caracter in nombre:
-        # Si el caracter no es letra, ni numero, ni guion bajo, es invalido
-        if not caracter.isalnum() and caracter != '_':
+# Deja un texto en su forma normalizada: sin espacios en los costados y en minusculas.
+# Se usa ANTES de comparar y ANTES de guardar, para que "Sniper", " sniper " y "SNIPER"
+# sean siempre el mismo nombre.
+def normalizar_texto(texto):
+    return texto.strip().lower()
+
+
+# Verifica que un texto contenga SOLO letras, numeros y guion bajo.
+def solo_caracteres_permitidos(texto):
+    for caracter in texto:
+        if caracter.isalnum() == False and caracter != "_":
             return False
-        # Chequeamos que tenga al menos una letra (no puede ser puro numero)
-        if caracter.isalpha():
-            tiene_letra = True
-            
-    if not tiene_letra:
-        return False
-        
     return True
 
-def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador, inscripcion_cerrada):
+
+# Verifica que el texto tenga al menos una letra
+# (descarta nombres compuestos solo por numeros y/o guiones bajos).
+def tiene_al_menos_una_letra(texto):
+    for caracter in texto:
+        if caracter.isalpha():
+            return True
+    return False
+
+
+# Valida un nombre de equipo o un nickname de jugador segun el punto 5.
+# Devuelve (True, "") si es valido, o (False, mensaje) si no lo es.
+def validar_nombre(nombre, longitud_min, longitud_max):
+    limpio = normalizar_texto(nombre)
+
+    if limpio == "":
+        return False, "El nombre no puede estar vacio ni tener solo espacios."
+
+    if len(limpio) < longitud_min:
+        return False, f"El nombre debe tener al menos {longitud_min} caracteres."
+
+    if len(limpio) > longitud_max:
+        return False, f"El nombre no puede superar los {longitud_max} caracteres."
+
+    if solo_caracteres_permitidos(limpio) == False:
+        return False, "Solo se permiten letras, numeros y guion bajo (sin espacios ni simbolos)."
+
+    if tiene_al_menos_una_letra(limpio) == False:
+        return False, "El nombre no puede estar compuesto solo por numeros o guiones bajos."
+
+    return True, ""
+
+
+# ============================================================
+# 2) Inscripcion de equipos y jugadores (puntos 2 a 6)
+# ============================================================
+
+# Indica si ya existe un equipo con ese nombre (comparacion normalizada).
+def existe_nombre_equipo(equipos, nombre):
+    buscado = normalizar_texto(nombre)
+    for equipo in equipos:
+        if normalizar_texto(equipo[1]) == buscado:
+            return True
+    return False
+
+
+# Indica si un nickname ya esta usado por algun jugador ya registrado en el torneo.
+def existe_nickname(jugadores, nickname):
+    buscado = normalizar_texto(nickname)
+    for jugador in jugadores:
+        if normalizar_texto(jugador[1]) == buscado:
+            return True
+    return False
+
+
+# Indica si un nickname ya fue cargado en la lista temporal del equipo en curso.
+def nickname_repetido_en_alta(nicknames_nuevos, nickname):
+    buscado = normalizar_texto(nickname)
+    for cargado in nicknames_nuevos:
+        if normalizar_texto(cargado) == buscado:
+            return True
+    return False
+
+
+# Control de estado: indica si se puede dar de alta un equipo nuevo.
+# Devuelve (True, "") o (False, motivo).
+def se_puede_registrar_equipo(equipos, inscripcion_cerrada, n_equipos):
     if inscripcion_cerrada:
-        print("La inscripcion esta cerrada. El cuadro del torneo ya fue generado.")
-        return
-        
-    if len(equipos) >= N_EQUIPOS:
-        print(f"Inscripcion cerrada: Ya se registraron los {N_EQUIPOS} equipos permitidos.")
-        return
-
-    nombre_equipo = input("Ingrese el nombre del equipo: ")
-    nombre_norm = normalizar_cadena(nombre_equipo)
-    
-    if not es_nombre_valido(nombre_norm):
-        print(f"Error: Nombre de equipo invalido ({LONGITUD_MIN_NOMBRE}-{LONGITUD_MAX_NOMBRE} caracteres, letras, numeros, sin espacios multiples).")
-        return
-        
-    for codigo, nombre in equipos:
-        if normalizar_cadena(nombre) == nombre_norm:
-            print("Error: El equipo ya se encuentra registrado.")
-            return
-            
-    codigo_equipo = f"E{len(equipos) + 1}"
-    jugadores_temporales = [] # Hasta que los 5 jugadores no sean válidos, se guardan acá
-    
-    print(f"\n--- Registrando jugadores para {nombre_equipo} ---")
-    while len(jugadores_temporales) < 5:
-        username = input(f"Ingrese el username del jugador {len(jugadores_temporales) + 1}/5: ")
-        user_norm = normalizar_cadena(username)
-        
-        if not es_nombre_valido(user_norm):
-            print("Error: Username invalido.")
-            continue
-            
-        # Busqueda de duplicado global sin break ni any()
-        duplicado_global = False
-        for j in jugadores:
-            if normalizar_cadena(j[1]) == user_norm:
-                duplicado_global = True
-                
-        # Busqueda de duplicado local sin break ni any()
-        duplicado_local = False
-        for j in jugadores_temporales:
-            if normalizar_cadena(j[1]) == user_norm:
-                duplicado_local = True
-        
-        if duplicado_global or duplicado_local:
-            print("Error: Ese jugador ya esta registrado en el torneo o en este equipo.")
-            continue
-            
-        num_jugador_actual = len(jugadores) + len(jugadores_temporales) + 1
-        cod_jugador = "J" + str(num_jugador_actual).zfill(2)
-        jugadores_temporales.append((cod_jugador, username, codigo_equipo))
-        print(f"Jugador '{username}' aceptado.")
-        
-    # Guardamos el equipo y los jugadores
-    equipos.append((codigo_equipo, nombre_equipo))
-    
-    for jug in jugadores_temporales:
-        jugadores.append(jug)
-        # LLAMADA CLAVE: Sincronizamos las matrices de estadisticas
-        agregar_fila_stats(matriz_stats, partidos_por_jugador) # Creación de estadisticas individuales a cada jugador
-        
-    print(f"\nAlta exitosa! El equipo '{nombre_equipo}' y sus 5 jugadores estan listos.\n")
-
-def listar_equipos_jugadores(equipos, jugadores):
-    if not equipos:
-        print("No hay equipos registrados actualmente.")
-        return
-        
-    print("\n----- LISTADO DE EQUIPOS Y JUGADORES -----")
-    for cod_eq, nom_eq in equipos:
-        print(f"\n[{cod_eq}] Equipo: {nom_eq}")
-        jugadores_del_equipo = [j for j in jugadores if j[2] == cod_eq]
-        for cod_j, username, _ in jugadores_del_equipo:
-            print(f"  - {cod_j}: {username}")
-    print("-" * 42)
+        return False, "La inscripcion esta cerrada: el cuadro del torneo ya fue generado."
+    if len(equipos) >= n_equipos:
+        return False, f"Ya hay {n_equipos} equipos registrados. No se admiten mas."
+    return True, ""
 
 
-# La siguiente función, agrega un partido al final de todas las listas paralelas de una sola vez, manteniendo el indice alineado entre ellas.
-# El Marcador arranca en -1 (no cargado) y jugado en False
+# Agrega la fila de estadisticas de UN jugador nuevo.
+# Se llama una vez por cada jugador agregado a la lista jugadores,
+# asi la fila i de matriz_stats corresponde siempre al jugador i.
+def agregar_fila_stats(matriz_stats, partidos_por_jugador):
+    matriz_stats.append([0, 0, 0])   # [bajas, muertes, asistencias] acumuladas
+    partidos_por_jugador.append(0)   # cantidad de partidos disputados
 
+
+# Alta definitiva de un equipo con sus jugadores (punto 6).
+# Recibe el nombre y los nicknames YA validados y normalizados por la interfaz.
+# Recien aca se tocan las estructuras definitivas: o entra el equipo completo o no entra nada.
+# Devuelve (True, mensaje) o (False, motivo).
+def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador,
+                     nombre_equipo, nicknames_nuevos, n_jugadores):
+    # Control de consistencia interna: exactamente n_jugadores.
+    if len(nicknames_nuevos) != n_jugadores:
+        return False, f"El equipo debe tener exactamente {n_jugadores} jugadores."
+
+    codigo_equipo = "E" + str(len(equipos) + 1)
+    equipos.append((codigo_equipo, normalizar_texto(nombre_equipo)))
+
+    for nickname in nicknames_nuevos:
+        codigo_jugador = "J" + str(len(jugadores) + 1).zfill(2)
+        jugadores.append((codigo_jugador, normalizar_texto(nickname), codigo_equipo))
+        # Cada jugador nuevo recibe su fila de estadisticas en el mismo indice.
+        agregar_fila_stats(matriz_stats, partidos_por_jugador)
+
+    return True, f"Equipo {codigo_equipo} registrado con {n_jugadores} jugadores."
+
+
+# ============================================================
+# 3) Cuadro del torneo: sorteo y estructura de partidos (puntos 7 a 9)
+# ============================================================
+
+# Agrega un partido al final de TODAS las listas paralelas de una sola vez,
+# manteniendo el indice alineado entre ellas.
+# El marcador arranca en -1 (no cargado) y jugado en False.
 def agregar_partido(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
                     partidos_rondasA, partidos_rondasB, partidos_jugado,
                     id_partido, fase, equipoA, equipoB):
-
-    
     partidos_id.append(id_partido)
     partidos_fase.append(fase)
     partidos_equipoA.append(equipoA)
@@ -121,43 +147,50 @@ def agregar_partido(partidos_id, partidos_fase, partidos_equipoA, partidos_equip
     partidos_rondasA.append(-1)
     partidos_rondasB.append(-1)
     partidos_jugado.append(False)
-    
-# Generación del sorteo
 
-# La función sortea los 8 equipos (una sola vez) y arma los 4 cuartos de final
-# También crea la estructura de las 2 semifinales y la final, con participantes desconocidos ""
-# Escribe sobre las listas parelelas (fuente unica)
 
+# Sortea los equipos una sola vez y arma los 4 cuartos de final.
+# Tambien crea las 2 semifinales y la final con participantes desconocidos ("").
+# Escribe directamente sobre las listas paralelas (fuente unica de informacion).
 def generar_cuadro(equipos, partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
-                   partidos_rondasA, partidos_rondasB, partidos_jugado):
+                   partidos_rondasA, partidos_rondasB, partidos_jugado, n_equipos, fases):
     # Copia local SOLO de los codigos de equipo, para sortear sin tocar la lista original.
     codigos = [equipo[0] for equipo in equipos]
     random.shuffle(codigos)
 
     # Partidos 1 a 4: Cuartos de Final, con equipos reales tomados de a pares.
-    for i in range(0, N_EQUIPOS, 2):
+    for i in range(0, n_equipos, 2):
         agregar_partido(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
                         partidos_rondasA, partidos_rondasB, partidos_jugado,
-                        len(partidos_id) + 1, FASES[0], codigos[i], codigos[i + 1])
+                        len(partidos_id) + 1, fases[0], codigos[i], codigos[i + 1])
 
-
-      # Partidos 5 y 6: Semifinales, participantes desconocidos por ahora.
+    # Partidos 5 y 6: Semifinales, participantes desconocidos por ahora.
     agregar_partido(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
                     partidos_rondasA, partidos_rondasB, partidos_jugado,
-                    len(partidos_id) + 1, FASES[1], "", "")
+                    len(partidos_id) + 1, fases[1], "", "")
     agregar_partido(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
                     partidos_rondasA, partidos_rondasB, partidos_jugado,
-                    len(partidos_id) + 1, FASES[1], "", "")
+                    len(partidos_id) + 1, fases[1], "", "")
 
     # Partido 7: Final, participantes desconocidos por ahora.
     agregar_partido(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
                     partidos_rondasA, partidos_rondasB, partidos_jugado,
-                    len(partidos_id) + 1, FASES[2], "", "")
+                    len(partidos_id) + 1, fases[2], "", "")
 
     return True
 
-# Devuelve el INDICE (posicion) del partido cuyo id coincide con id_partido.
-# Si no existe ningun partido con ese id, devuelve -1.
+
+# Control de estado: solo se genera el cuadro con los n_equipos registrados
+# y si todavia no se genero.
+def se_puede_generar_cuadro(equipos, cuadro_generado, n_equipos):
+    if cuadro_generado:
+        return False
+    if len(equipos) < n_equipos:
+        return False
+    return True
+
+
+# Devuelve el INDICE (posicion) del partido cuyo id coincide con id_partido, o -1 si no existe.
 def buscar_indice_partido(partidos_id, id_partido):
     for i in range(len(partidos_id)):
         if partidos_id[i] == id_partido:
@@ -165,55 +198,42 @@ def buscar_indice_partido(partidos_id, id_partido):
     return -1
 
 
+# ============================================================
+# 4) Carga de resultados y progresion del cuadro (puntos 12 a 15)
+# ============================================================
 
-# Validación del marcador
-
-#Punto 13: valida un marcador segun la regla simplificada.
-    #Regla: gana quien llega primero a RONDAS_PARA_GANAR (13), sin prorroga.
-    #Devuelve (True, "") si es valido, o (False, mensaje) si no lo es.
-
-    #Un marcador es valido solo si:
-     # - Ambos valores son numeros enteros.
-     # - Ninguno es negativo.
-     # - Exactamente uno de los dos vale RONDAS_PARA_GANAR (el ganador).
-     # - El otro (el perdedor) es menor a RONDAS_PARA_GANAR.
-
-
-def validar_marcador(rondas_A, rondas_B):
-   
-    # Que no sean negativos.
+# Valida un marcador segun la regla simplificada:
+# gana quien llega primero a rondas_para_ganar (13), sin prorroga.
+# Valido solo si: ninguno es negativo, exactamente uno vale 13 y el otro es menor a 13.
+# Devuelve (True, "") o (False, mensaje).
+def validar_marcador(rondas_A, rondas_B, rondas_para_ganar):
     if rondas_A < 0 or rondas_B < 0:
         return False, "Las rondas no pueden ser negativas."
 
-    # Que exactamente uno haya llegado a 13.
-    a_gano = rondas_A == RONDAS_PARA_GANAR
-    b_gano = rondas_B == RONDAS_PARA_GANAR
+    a_gano = rondas_A == rondas_para_ganar
+    b_gano = rondas_B == rondas_para_ganar
 
     if not a_gano and not b_gano:
-        return False, f"Ningun equipo llego a {RONDAS_PARA_GANAR} rondas: el partido no esta terminado."
+        return False, f"Ningun equipo llego a {rondas_para_ganar} rondas: el partido no esta terminado."
 
     if a_gano and b_gano:
-        return False, "No puede haber empate: ambos no pueden tener 13 rondas."
+        return False, f"No puede haber empate: ambos no pueden tener {rondas_para_ganar} rondas."
 
-    # El perdedor debe tener menos de 13 (esto tambien descarta el empate 13-13).
     if a_gano:
         perdedor = rondas_B
     else:
         perdedor = rondas_A
 
-    if perdedor >= RONDAS_PARA_GANAR:
-        return False, f"El perdedor debe tener menos de {RONDAS_PARA_GANAR} rondas."
-
+    if perdedor >= rondas_para_ganar:
+        return False, f"El perdedor debe tener menos de {rondas_para_ganar} rondas."
 
     return True, ""
 
 
-# Punto 14
-
-# Valida que un resultado se pueda cargar antes de aceptarlo.
-
+# Valida que un resultado se pueda cargar antes de aceptarlo (punto 14).
+# Devuelve (True, indice, "") si es valido, o (False, -1, mensaje) si algo falla.
 def validar_carga_partido(partidos_id, partidos_equipoA, partidos_equipoB, partidos_jugado,
-                          id_partido, rondas_A, rondas_B):
+                          id_partido, rondas_A, rondas_B, rondas_para_ganar):
     # 1) El partido debe existir.
     indice = buscar_indice_partido(partidos_id, id_partido)
     if indice == -1:
@@ -223,56 +243,66 @@ def validar_carga_partido(partidos_id, partidos_equipoA, partidos_equipoB, parti
     if partidos_jugado[indice]:
         return False, -1, f"El partido {id_partido} ya tiene su resultado cargado."
 
-    # 3) Ambos equipos deben estar definidos (no vacios).
+    # 3) Ambos equipos deben estar definidos (semis y final dependen de partidos previos).
     if partidos_equipoA[indice] == "" or partidos_equipoB[indice] == "":
         return False, -1, f"El partido {id_partido} todavia no tiene definidos sus dos equipos."
 
     # 4) El marcador debe cumplir la regla del punto 13.
-    marcador_ok, mensaje = validar_marcador(rondas_A, rondas_B)
+    marcador_ok, mensaje = validar_marcador(rondas_A, rondas_B, rondas_para_ganar)
     if not marcador_ok:
         return False, -1, mensaje
 
     return True, indice, ""
 
 
-# Punto 12: determina automaticamente el codigo del equipo ganador de un partido.
+# Determina automaticamente el codigo del equipo ganador (punto 12).
 # Precondicion: el marcador ya fue validado (no hay empate).
 def determinar_ganador(partidos_equipoA, partidos_equipoB,
                        partidos_rondasA, partidos_rondasB, indice):
-
-    
     if partidos_rondasA[indice] > partidos_rondasB[indice]:
         return partidos_equipoA[indice]
     else:
         return partidos_equipoB[indice]
 
 
+# Coloca al ganador en el partido siguiente que corresponda (punto 15).
+# Devuelve el codigo del campeon si se cerro la final, o "" si todavia no.
+def avanzar_cuadro(partidos_equipoA, partidos_equipoB, indice, ganador):
+    # Ganadores de CUARTOS (indices 0 a 3) van a las SEMIFINALES (4 y 5)
+    if indice == 0:
+        partidos_equipoA[4] = ganador   # ganador del cuarto 1 -> Semifinal 1, lado A
+    elif indice == 1:
+        partidos_equipoB[4] = ganador   # ganador del cuarto 2 -> Semifinal 1, lado B
+    elif indice == 2:
+        partidos_equipoA[5] = ganador   # ganador del cuarto 3 -> Semifinal 2, lado A
+    elif indice == 3:
+        partidos_equipoB[5] = ganador   # ganador del cuarto 4 -> Semifinal 2, lado B
+    # Ganadores de SEMIFINALES (indices 4 y 5) van a la FINAL (6)
+    elif indice == 4:
+        partidos_equipoA[6] = ganador   # ganador de Semifinal 1 -> Final, lado A
+    elif indice == 5:
+        partidos_equipoB[6] = ganador   # ganador de Semifinal 2 -> Final, lado B
+    # Ganador de la FINAL (indice 6) es el campeon
+    elif indice == 6:
+        return ganador
+
+    return ""
 
 
-# Carga del resultado
-
-#Pasos:
-    #1. Valida la carga ( existe, no jugado, equipos definidos, marcador ok).
-    #2. Si es valida, escribe las rondas en las listas paralelas.
-    #3. Marca el partido como jugado.
-    #4. Determina el ganador .
-    #5. Hace avanzar el cuadro con ese ganador .
-    #Devuelve (True, mensaje_exito) o (False, mensaje_error).
-
-
-# Carga el resultado de un partido. Junta los puntos 12, 13 y 14.
-# Devuelve (True, mensaje_exito) o (False, mensaje_error).
-def cargar_resultado(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
+# Carga el resultado de un partido: valida, escribe el marcador, marca jugado,
+# determina el ganador y avanza el cuadro.
+# Devuelve (True, mensaje, campeon) o (False, mensaje, "").
+def cargar_resultado(partidos_id, partidos_equipoA, partidos_equipoB,
                      partidos_rondasA, partidos_rondasB, partidos_jugado,
-                     id_partido, rondas_A, rondas_B):
+                     id_partido, rondas_A, rondas_B, rondas_para_ganar):
     # 1) Validar todo antes de tocar nada.
     es_valido, indice, mensaje = validar_carga_partido(
         partidos_id, partidos_equipoA, partidos_equipoB, partidos_jugado,
-        id_partido, rondas_A, rondas_B)
+        id_partido, rondas_A, rondas_B, rondas_para_ganar)
     if not es_valido:
         return False, mensaje, ""
 
-    # 2) Escribir el marcador en la fila del partido.
+    # 2) Escribir el marcador en la posicion del partido.
     partidos_rondasA[indice] = rondas_A
     partidos_rondasB[indice] = rondas_B
 
@@ -283,242 +313,34 @@ def cargar_resultado(partidos_id, partidos_fase, partidos_equipoA, partidos_equi
     ganador = determinar_ganador(partidos_equipoA, partidos_equipoB,
                                  partidos_rondasA, partidos_rondasB, indice)
 
-    # 5) Hacer avanzar el cuadro colocando al ganador donde corresponda.
-    #    Si se cerro la final, devuelve el codigo del campeon; si no, "".
+    # 5) Avanzar el cuadro. Si se cerro la final, devuelve el campeon.
     campeon = avanzar_cuadro(partidos_equipoA, partidos_equipoB, indice, ganador)
 
     return True, f"Resultado del partido {id_partido} cargado. Ganador: {ganador}.", campeon
 
-# Colocar al ganador de un partido en el partido siguiente que corresponda.
-# Recibe el indice del partido recien cerrado y el codigo del equipo ganador.
-# Devuelve el codigo del campeon si se cerro la final, o "" si todavia no.
 
-
-def avanzar_cuadro(partidos_equipoA, partidos_equipoB, indice, ganador):
-
-    # Ganadores de CUARTOS (indices 0 a 3) van a las SEMIFINALES (4 y 5)
-
-    if indice == 0: #primera partida
-        partidos_equipoA[4] = ganador   # ganador del cuarto 1 -> Semifinal 1, lado A
-
-    elif indice == 1:
-        partidos_equipoB[4] = ganador   # ganador del cuarto 2 -> Semifinal 1, lado B
-
-    elif indice == 2:
-        partidos_equipoA[5] = ganador   # ganador del cuarto 3 -> Semifinal 2, lado A
-
-    elif indice == 3:
-        partidos_equipoB[5] = ganador   # ganador del cuarto 4 -> Semifinal 2, lado B
-
-    # ----- Ganadores de SEMIFINALES (indices 4 y 5) van a la FINAL (6) -----
-    elif indice == 4:
-        partidos_equipoA[6] = ganador   # ganador de Semifinal 1 -> Final, lado A
-
-    elif indice == 5:
-        partidos_equipoB[6] = ganador   # ganador de Semifinal 2 -> Final, lado B
-
-    # Ganador de la FINAL (indice 6) es el campeon
-
-    elif indice == 6:
-        return ganador   # se devuelve el campeon
-
-    # Si el partido cerrado no era la final, todavia no hay campeon.
-
-    return ""
-
-# Indicar si se puede generar el cuadro de cuartos.
-# Solo se permite cuando hay exactamente N_EQUIPOS (8) registrados y el cuadro aun no se genero.
-
-def se_puede_generar_cuadro(equipos, cuadro_generado):
-
-    if cuadro_generado:
-        return False
-    if len(equipos) < N_EQUIPOS:
-        return False
-
-    return True
-
-
-# Indicar si un partido puntual esta listo para cargar su resultado.
-# Un partido esta listo cuando ya tiene definidos sus dos equipos (no estan en "") y todavia no fue jugado.
-
-
-def se_puede_cargar_partido(partidos_equipoA, partidos_equipoB, partidos_jugado, indice):
-
-    # Si el indice no es valido, no se puede.
-
-    if indice < 0 or indice >= len(partidos_jugado):
-        return False
-    
-    # Si ya se jugo, no se puede volver a cargar.
-
-    if partidos_jugado[indice]:
-        return False
-
-    # Si alguno de los dos equipos todavia no esta definido, no se puede.
-
-    if partidos_equipoA[indice] == "" or partidos_equipoB[indice] == "":
-        return False
-    return True
-
-
-# Indicar si ya se cargo al menos un partido con resultado.
-# Sirve para bloquear consultas de informes/estadisticas cuando no hay datos aun (lo pidio la profe: no consultar MVP, rankings, etc. sin partidos cargados).
-
+# Indica si ya se cargo al menos un partido (bloquea rankings e informes sin datos).
 def hay_partidos_jugados(partidos_jugado):
-
     for jugado in partidos_jugado:
         if jugado:
             return True
-
-
     return False
 
 
-# Pide un numero entero por consola de forma segura.
-# Si el usuario escribe algo que no es un numero entero, avisa y vuelve a pedir.
-# No deja avanzar hasta recibir un entero valido.
+# ============================================================
+# 5) Busquedas (punto 22)
+# ============================================================
 
-def pedir_entero(mensaje): # Validación a la hora de ingresar cualquier número
-    seguir = True
-    numero = 0
-    while seguir == True:
-        texto = input(mensaje)
-        # strip() saca espacios de los costados; lstrip("-") saca un signo menos inicial
-        # para poder aceptar negativos y que isdigit los reconozca.
-        limpio = texto.strip()
-        if limpio.lstrip("-").isdigit():
-            numero = int(limpio)
-            seguir = False
-        else:
-            print("Entrada invalida: escribi un numero entero.")
-
-    return numero
-
-
-
-# Muestra el estado completo del cuadro del torneo.
-# Recorre las 7 listas paralelas por indice y arma una linea por partido.
-# Si el partido ya se jugo, muestra el marcador; si no, lo marca como pendiente.
-
-def mostrar_cuadro(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
-                   partidos_rondasA, partidos_rondasB, partidos_jugado, campeon):
-    
-    print("----- CUADRO DEL TORNEO -----")
-
-    for i in range(len(partidos_id)):
-        # Si un equipo todavia no esta definido, se muestra "?" en vez de vacio.
-        if partidos_equipoA[i] == "":
-            equipoA = "?"
-        else:
-            equipoA = partidos_equipoA[i]
-
-        if partidos_equipoB[i] == "":
-            equipoB = "?"
-        else:
-            equipoB = partidos_equipoB[i]
-
-        # Arma la parte del marcador segun si el partido ya se jugo o no.
-        if partidos_jugado[i]:
-            marcador = f"{partidos_rondasA[i]} - {partidos_rondasB[i]}"
-        else:
-            marcador = "pendiente"
-
-        # Linea final del partido.
-        print(f"Partido {partidos_id[i]} ({partidos_fase[i]}): {equipoA} vs {equipoB}  [{marcador}]")
-
-    # Al final, el estado del campeon.
-    if campeon == "":
-        print("Campeon: aun no definido.")
-    else:
-        print(f"Campeon del torneo: {campeon}")
-
-
-# Devuelve el INDICE del equipo cuyo codigo coincide (case-insensitive, normalizado).
-# Si no existe, devuelve -1.
+# Devuelve el INDICE del equipo cuyo codigo coincide (comparacion normalizada), o -1.
 def buscar_indice_equipo(equipos, codigo_buscado):
-    # Normalizamos: sin espacios de los costados y en mayusculas, para comparar parejo.
-    codigo_normalizado = codigo_buscado.strip().upper()
+    buscado = normalizar_texto(codigo_buscado)
     for i in range(len(equipos)):
-        # equipos[i] es la tupla (codigo_equipo, nombre_equipo); [0] es el codigo.
-        if equipos[i][0].strip().upper() == codigo_normalizado:
+        if normalizar_texto(equipos[i][0]) == buscado:
             return i
     return -1
 
 
-# Muestra los datos de un equipo (por su codigo): nombre, jugadores y partidos donde aparece.
-# Recibe las estructuras necesarias y el codigo que ingreso el usuario.
-def mostrar_equipo(equipos, jugadores, partidos_id, partidos_fase,
-                   partidos_equipoA, partidos_equipoB, codigo_buscado):
-    indice = buscar_indice_equipo(equipos, codigo_buscado)
-
-    # Si no se encontro, avisamos y cortamos.
-    if indice == -1:
-        print(f"No existe un equipo con codigo '{codigo_buscado}'.")
-        return
-
-    # Datos basicos del equipo.
-    codigo_equipo = equipos[indice][0]
-    nombre_equipo = equipos[indice][1]
-    print()
-    print(f"----- EQUIPO {codigo_equipo}: {nombre_equipo} -----")
-
-    # Jugadores del equipo: recorremos la lista de jugadores y filtramos por codigo_equipo.
-    print("Jugadores:")
-    hay_jugadores = False
-    for jugador in jugadores:
-        # jugador es la tupla (codigo_jugador, nickname, codigo_equipo); [2] es su equipo.
-        if jugador[2] == codigo_equipo:
-            print(f"  - {jugador[0]}: {jugador[1]}")
-            hay_jugadores = True
-    if hay_jugadores == False:
-        print("  (sin jugadores registrados)")
-
-    # Partidos donde aparece este equipo (como A o como B).
-    print("Partidos en el cuadro:")
-    aparece = False
-    for i in range(len(partidos_id)):
-        if partidos_equipoA[i] == codigo_equipo or partidos_equipoB[i] == codigo_equipo:
-            print(f"  - Partido {partidos_id[i]} ({partidos_fase[i]})")
-            aparece = True
-    if aparece == False:
-        print("  (todavia no aparece en ningun partido)")
-
-# ============================================================
-# PARTE C - Estadisticas, KDA e informes
-# Estas funciones van PEGADAS AL FINAL de operaciones.py
-# Recordar ampliar el import de arriba de operaciones.py a:
-#   from datos import (N_EQUIPOS, N_JUGADORES, FASES, RONDAS_PARA_GANAR,
-#                      UMBRAL_KDA, UMBRAL_CLUTCH,
-#                      COL_BAJAS, COL_MUERTES, COL_ASISTENCIAS,
-#                      NOMBRES_ESTADISTICAS)
-# ============================================================
-
-
-# ------------------------------------------------------------
-# 1) Sincronizacion de matriz_stats  (el hueco que nadie tenia)
-# ------------------------------------------------------------
-
-# Agrega la fila de estadisticas de UN jugador nuevo.
-# Debe llamarse UNA VEZ por cada jugador que se agrega a la lista jugadores,
-# inmediatamente despues del append del jugador (lo hace la Parte A).
-# Asi la fila i de matriz_stats corresponde siempre al jugador i.
-def agregar_fila_stats(matriz_stats, partidos_por_jugador):
-    matriz_stats.append([0, 0, 0])   # [bajas, muertes, asistencias] acumuladas
-    partidos_por_jugador.append(0)   # cuantos partidos disputo ese jugador
-
-
-# ------------------------------------------------------------
-# 2) Normalizacion y busquedas
-# ------------------------------------------------------------
-
-# Deja un texto listo para comparar: sin espacios de los costados y en minusculas.
-def normalizar_texto(texto):
-    return texto.strip().lower()
-
-
-# Devuelve el INDICE del jugador cuyo codigo O nickname coincide.
-# La comparacion es case-insensitive y normalizada. Si no existe, devuelve -1.
+# Devuelve el INDICE del jugador cuyo codigo O nickname coincide (normalizado), o -1.
 def buscar_indice_jugador(jugadores, texto_buscado):
     buscado = normalizar_texto(texto_buscado)
     for i in range(len(jugadores)):
@@ -538,64 +360,40 @@ def indices_de_equipo(jugadores, codigo_equipo):
     return indices
 
 
-# ------------------------------------------------------------
-# 3) Carga de estadisticas de un partido (punto 10)
-# ------------------------------------------------------------
-
-# Pide un numero entero mayor o igual a cero. Reutiliza pedir_entero de la Parte B.
-def pedir_estadistica(mensaje):
-    seguir = True
-    valor = 0
-    while seguir == True:
-        valor = pedir_entero(mensaje)
-        if valor < 0:
-            print("Valor invalido: no puede ser negativo.")
-        else:
-            seguir = False
-    return valor
+# Devuelve una LISTA DE INDICES de los partidos donde aparece un equipo (como A o como B).
+def indices_partidos_de_equipo(partidos_equipoA, partidos_equipoB, codigo_equipo):
+    indices = []
+    for i in range(len(partidos_equipoA)):
+        if partidos_equipoA[i] == codigo_equipo or partidos_equipoB[i] == codigo_equipo:
+            indices.append(i)
+    return indices
 
 
-# Carga las estadisticas de los 5 jugadores de UN equipo y las ACUMULA en la matriz.
-def cargar_stats_de_equipo(jugadores, matriz_stats, partidos_por_jugador, codigo_equipo):
-    indices = indices_de_equipo(jugadores, codigo_equipo)
-    print()
-    print(f"--- Estadisticas del equipo {codigo_equipo} ---")
-    for i in indices:
-        print(f"Jugador {jugadores[i][0]} ({jugadores[i][1]}):") # (0=código, 1=nick, 2=equipo).
-        bajas = pedir_estadistica("  Bajas: ")
-        muertes = pedir_estadistica("  Muertes: ")
-        asistencias = pedir_estadistica("  Asistencias: ")
+# ============================================================
+# 6) Estadisticas y KDA (puntos 10, 11, 16, 21)
+# ============================================================
+# Orden fijo de columnas de matriz_stats: 0 = bajas, 1 = muertes, 2 = asistencias.
+# Ese orden se resuelve solo en estas dos funciones; el resto del programa las reutiliza.
 
-        # Se SUMAN a lo que ya tenia acumulado del torneo (no se reemplaza).
-        matriz_stats[i][COL_BAJAS] = matriz_stats[i][COL_BAJAS] + bajas
-        matriz_stats[i][COL_MUERTES] = matriz_stats[i][COL_MUERTES] + muertes
-        matriz_stats[i][COL_ASISTENCIAS] = matriz_stats[i][COL_ASISTENCIAS] + asistencias
-
-        # Se registra que este jugador disputo un partido mas.
-        partidos_por_jugador[i] = partidos_por_jugador[i] + 1
+# Devuelve las estadisticas acumuladas de un jugador como (bajas, muertes, asistencias).
+def obtener_stats(matriz_stats, indice):
+    fila = matriz_stats[indice]
+    return fila[0], fila[1], fila[2]
 
 
-# Carga las estadisticas de los 10 jugadores de un partido (5 por equipo).
-# Se llama DESPUES de que cargar_resultado devolvio True.
-def cargar_estadisticas_partido(jugadores, matriz_stats, partidos_por_jugador,
-                                codigo_equipoA, codigo_equipoB):
-    cargar_stats_de_equipo(jugadores, matriz_stats, partidos_por_jugador, codigo_equipoA)
-    cargar_stats_de_equipo(jugadores, matriz_stats, partidos_por_jugador, codigo_equipoB)
-    print()
-    print("Estadisticas del partido cargadas correctamente.")
+# SUMA las estadisticas de un partido a lo acumulado del jugador (no reemplaza)
+# y registra que disputo un partido mas.
+def acumular_stats(matriz_stats, partidos_por_jugador, indice, bajas, muertes, asistencias):
+    matriz_stats[indice][0] = matriz_stats[indice][0] + bajas
+    matriz_stats[indice][1] = matriz_stats[indice][1] + muertes
+    matriz_stats[indice][2] = matriz_stats[indice][2] + asistencias
+    partidos_por_jugador[indice] = partidos_por_jugador[indice] + 1
 
-
-# ------------------------------------------------------------
-# 4) KDA (punto 16)
-# ------------------------------------------------------------
 
 # KDA = (bajas + asistencias) / muertes   si muertes > 0
 # KDA = bajas + asistencias               si muertes == 0
 def calcular_kda(matriz_stats, indice):
-    bajas = matriz_stats[indice][COL_BAJAS]
-    muertes = matriz_stats[indice][COL_MUERTES]
-    asistencias = matriz_stats[indice][COL_ASISTENCIAS]
-
+    bajas, muertes, asistencias = obtener_stats(matriz_stats, indice)
     if muertes > 0:
         return (bajas + asistencias) / muertes
     else:
@@ -607,153 +405,90 @@ def jugo_algun_partido(partidos_por_jugador, indice):
     return partidos_por_jugador[indice] > 0
 
 
-# Jugador clutch: KDA acumulado mayor o igual a UMBRAL_CLUTCH (punto 21).
-def es_clutch(kda):
-    return kda >= UMBRAL_CLUTCH
+# Jugador clutch: KDA acumulado mayor o igual al umbral configurado.
+def es_clutch(kda, umbral_clutch):
+    return kda >= umbral_clutch
 
 
-# ------------------------------------------------------------
-# 5) Ranking (comprehension + lambda + slicing)  (punto 23)
-# ------------------------------------------------------------
+# ============================================================
+# 7) Ranking, MVP y equipo mas letal (puntos 17, 18, 23)
+# ============================================================
 
 # Construye el ranking de jugadores por KDA, de mayor a menor.
 # Solo incluye a los que disputaron al menos un partido.
-# Cada fila del ranking es: [kda, codigo_jugador, nickname, codigo_equipo]
+# Cada registro es una TUPLA fija: (kda, codigo_jugador, nickname, codigo_equipo).
 def construir_ranking(jugadores, matriz_stats, partidos_por_jugador):
-    # COMPREHENSION: arma la lista de KDA de todos los jugadores.
+    # COMPRENSION: lista de KDA de todos los jugadores (mismo indice que jugadores).
     kdas = [calcular_kda(matriz_stats, i) for i in range(len(jugadores))]
 
     ranking = []
     for i in range(len(jugadores)):
         if jugo_algun_partido(partidos_por_jugador, i):
-            ranking.append([kdas[i], jugadores[i][0], jugadores[i][1], jugadores[i][2]])
+            ranking.append((kdas[i], jugadores[i][0], jugadores[i][1], jugadores[i][2]))
 
-    # LAMBDA: ordena por el KDA (posicion 0 de cada fila), de mayor a menor.
-    ranking.sort(key=lambda fila: fila[0], reverse=True) # lambda fila: fila[0] es una mini-función que recibe una fila del ranking (fila) y devuelve su primer elemento (fila[0], que es el KDA).
+    # LAMBDA: ordena por el KDA (posicion 0 de cada tupla), de mayor a menor.
+    ranking.sort(key=lambda registro: registro[0], reverse=True)
     return ranking
 
 
-# Informe 2: ranking completo de jugadores por KDA.
-def mostrar_ranking_completo(ranking):
-    print()
-    print("----- RANKING DE JUGADORES POR KDA -----")
+# SLICING: los tres primeros del ranking (si hay menos de 3, devuelve los que haya).
+def obtener_top3(ranking):
+    return ranking[:3]
+
+
+# MVP: jugador(es) con el KDA maximo. Si hay empate se devuelven todos.
+# Como el ranking ya esta ordenado, el maximo esta en la posicion 0.
+def obtener_mvp(ranking):
     if len(ranking) == 0:
-        print("Todavia no hay jugadores con partidos disputados.")
-        return
-
-    posicion = 1
-    for fila in ranking:
-        kda = fila[0]
-        if es_clutch(kda):
-            marca = "  [CLUTCH]"
-        else:
-            marca = ""
-        print(f"{posicion}. {fila[2]} ({fila[1]}) - equipo {fila[3]} - KDA: {kda:.2f}{marca}")
-        posicion = posicion + 1
-
-
-# Informe 3: Top 3 por KDA. Usa SLICING.
-def mostrar_top3(ranking):
-    print()
-    print("----- TOP 3 DE JUGADORES POR KDA -----")
-    if len(ranking) == 0:
-        print("Todavia no hay jugadores con partidos disputados.")
-        return
-
-    top3 = ranking[:3]   # SLICING
-    posicion = 1
-    for fila in top3:
-        print(f"{posicion}. {fila[2]} ({fila[1]}) - KDA: {fila[0]:.2f}")
-        posicion = posicion + 1
-
-
-# ------------------------------------------------------------
-# 6) MVP, equipo mas letal, promedio y conteo (puntos 17 a 20)
-# ------------------------------------------------------------
-
-# Informe 4: MVP del torneo = jugador con mayor KDA acumulado.
-# Si hay empate en el KDA maximo, se informan TODOS (punto 17).
-def mostrar_mvp(ranking):
-    print()
-    print("----- MVP DEL TORNEO -----")
-    if len(ranking) == 0:
-        print("Todavia no hay jugadores con partidos disputados.")
-        return
-
-    # El ranking ya esta ordenado de mayor a menor: el maximo esta en la posicion 0.
+        return []
     kda_maximo = ranking[0][0]
-
-    empatados = []
-    for fila in ranking:
-        if fila[0] == kda_maximo:
-            empatados.append(fila)
-
-    if len(empatados) == 1:
-        fila = empatados[0]
-        print(f"MVP: {fila[2]} ({fila[1]}) - equipo {fila[3]} - KDA: {fila[0]:.2f}")
-    else:
-        print(f"Hay {len(empatados)} jugadores empatados con KDA {kda_maximo:.2f}:")
-        for fila in empatados:
-            print(f"  - {fila[2]} ({fila[1]}) - equipo {fila[3]}")
+    return [registro for registro in ranking if registro[0] == kda_maximo]
 
 
-# Devuelve el total de bajas acumuladas por los jugadores de un equipo.
+# Total de bajas acumuladas por los jugadores de un equipo.
 def bajas_de_equipo(jugadores, matriz_stats, codigo_equipo):
     total = 0
     for i in indices_de_equipo(jugadores, codigo_equipo):
-        total = total + matriz_stats[i][COL_BAJAS]
+        bajas, muertes, asistencias = obtener_stats(matriz_stats, i)
+        total = total + bajas
     return total
 
 
-# Informe 5: equipo mas letal = el que acumula mas bajas en total (punto 18).
-def mostrar_equipo_mas_letal(equipos, jugadores, matriz_stats):
-    print()
-    print("----- EQUIPO MAS LETAL -----")
-    if len(equipos) == 0:
-        print("Todavia no hay equipos registrados.")
-        return
-
+# Equipo(s) mas letal(es): los que acumulan mas bajas. Contempla empates.
+# Devuelve (mejor_total, lista de tuplas de equipo empatadas).
+def obtener_equipos_mas_letales(equipos, jugadores, matriz_stats):
     mejor_total = -1
     empatados = []
-
     for equipo in equipos:
-        codigo = equipo[0]
-        nombre = equipo[1]
-        total = bajas_de_equipo(jugadores, matriz_stats, codigo)
-
+        total = bajas_de_equipo(jugadores, matriz_stats, equipo[0])
         if total > mejor_total:
             mejor_total = total
-            empatados = [[codigo, nombre]]
+            empatados = [equipo]
         elif total == mejor_total:
-            empatados.append([codigo, nombre])
-
-    if mejor_total <= 0:
-        print("Todavia no hay bajas cargadas en el torneo.")
-        return
-
-    if len(empatados) == 1:
-        print(f"{empatados[0][1]} ({empatados[0][0]}) con {mejor_total} bajas.")
-    else:
-        print(f"Hay {len(empatados)} equipos empatados con {mejor_total} bajas:")
-        for fila in empatados:
-            print(f"  - {fila[1]} ({fila[0]})")
+            empatados.append(equipo)
+    return mejor_total, empatados
 
 
-# Punto 19: promedio de bajas por jugador, contando solo a los que jugaron.
+# ============================================================
+# 8) Indicadores del resumen general (puntos 19, 20, informe 6)
+# ============================================================
+
+# Promedio de bajas por jugador, contando solo a los que jugaron al menos un partido.
 def promedio_bajas_por_jugador(matriz_stats, partidos_por_jugador):
     total_bajas = 0
     cantidad = 0
     for i in range(len(matriz_stats)):
         if jugo_algun_partido(partidos_por_jugador, i):
-            total_bajas = total_bajas + matriz_stats[i][COL_BAJAS]
+            bajas, muertes, asistencias = obtener_stats(matriz_stats, i)
+            total_bajas = total_bajas + bajas
             cantidad = cantidad + 1
 
-    if cantidad == 0: # Se utiliza para evitar que el programa se rompa por dividir por cero
+    if cantidad == 0:   # evita dividir por cero si nadie jugo
         return 0.0
     return total_bajas / cantidad
 
 
-# Punto 20: cantidad de jugadores con KDA superior al umbral configurado.
+# Cantidad de jugadores (que jugaron) con KDA superior al umbral configurado.
 def contar_kda_superior(matriz_stats, partidos_por_jugador, umbral):
     cantidad = 0
     for i in range(len(matriz_stats)):
@@ -762,43 +497,6 @@ def contar_kda_superior(matriz_stats, partidos_por_jugador, umbral):
                 cantidad = cantidad + 1
     return cantidad
 
-
-# ------------------------------------------------------------
-# 7) Busqueda de jugador (punto 22, menu 6)
-# ------------------------------------------------------------
-
-# Muestra la ficha completa de un jugador buscado por codigo o nickname.
-def mostrar_jugador(jugadores, matriz_stats, partidos_por_jugador, texto_buscado):
-    indice = buscar_indice_jugador(jugadores, texto_buscado)
-
-    if indice == -1:
-        print(f"No existe un jugador con codigo o nickname '{texto_buscado}'.")
-        return
-
-    codigo = jugadores[indice][0]
-    nickname = jugadores[indice][1]
-    codigo_equipo = jugadores[indice][2]
-
-    print()
-    print(f"----- JUGADOR {codigo}: {nickname} -----")
-    print(f"Equipo: {codigo_equipo}")
-    print(f"Partidos disputados: {partidos_por_jugador[indice]}")
-    print(f"{NOMBRES_ESTADISTICAS[COL_BAJAS]}: {matriz_stats[indice][COL_BAJAS]}")
-    print(f"{NOMBRES_ESTADISTICAS[COL_MUERTES]}: {matriz_stats[indice][COL_MUERTES]}")
-    print(f"{NOMBRES_ESTADISTICAS[COL_ASISTENCIAS]}: {matriz_stats[indice][COL_ASISTENCIAS]}")
-
-    if jugo_algun_partido(partidos_por_jugador, indice):
-        kda = calcular_kda(matriz_stats, indice)
-        print(f"KDA acumulado: {kda:.2f}")
-        if es_clutch(kda):
-            print("Condicion: JUGADOR CLUTCH (KDA >= 3.0)")
-    else:
-        print("KDA acumulado: sin partidos disputados.")
-
-
-# ------------------------------------------------------------
-# 8) Resumen general (informe 6)
-# ------------------------------------------------------------
 
 # Cuenta cuantos partidos ya tienen resultado cargado.
 def contar_partidos_jugados(partidos_jugado):
@@ -821,232 +519,3 @@ def equipos_eliminados(partidos_equipoA, partidos_equipoB,
                 perdedor = partidos_equipoA[i]
             eliminados.append(perdedor)
     return eliminados
-
-
-# Informe 6: resumen general del torneo.
-def mostrar_resumen_general(equipos, jugadores, matriz_stats, partidos_por_jugador,
-                            partidos_equipoA, partidos_equipoB,
-                            partidos_rondasA, partidos_rondasB, partidos_jugado):
-    print()
-    print("----- RESUMEN GENERAL DEL TORNEO -----")
-
-    jugados = contar_partidos_jugados(partidos_jugado)
-    print(f"Partidos jugados: {jugados} de {len(partidos_jugado)}")
-
-    eliminados = equipos_eliminados(partidos_equipoA, partidos_equipoB,
-                                    partidos_rondasA, partidos_rondasB, partidos_jugado)
-    if len(eliminados) == 0:
-        print("Equipos eliminados: ninguno todavia.")
-    else:
-        print(f"Equipos eliminados ({len(eliminados)}):")
-        for codigo in eliminados:
-            indice_equipo = buscar_indice_equipo(equipos, codigo)
-            if indice_equipo == -1:
-                print(f"  - {codigo}")
-            else:
-                print(f"  - {equipos[indice_equipo][1]} ({codigo})")
-
-    promedio = promedio_bajas_por_jugador(matriz_stats, partidos_por_jugador)
-    print(f"Promedio de bajas por jugador: {promedio:.2f}")
-
-    cantidad = contar_kda_superior(matriz_stats, partidos_por_jugador, UMBRAL_KDA)
-    print(f"Jugadores con KDA mayor a {UMBRAL_KDA}: {cantidad}")
-
-
-# ============================================================
-# PARTE A (RESPALDO) - Inscripcion y validaciones
-# Esto es un PLAN B: se usa solo si el integrante a cargo no entrega.
-# Va pegado en operaciones.py igual que la Parte C.
-# ============================================================
-
-
-# ------------------------------------------------------------
-# Punto 5: definicion de nombre / nickname valido
-# ------------------------------------------------------------
-
-# Verifica que un texto contenga SOLO letras, numeros y guion bajo.
-def solo_caracteres_permitidos(texto):
-    for caracter in texto:
-        if caracter.isalnum() == False and caracter != "_":
-            return False
-    return True
-
-
-# Verifica que el texto tenga al menos una letra
-# (asi se descarta un nombre compuesto solo por numeros y/o guiones bajos).
-def tiene_al_menos_una_letra(texto):
-    for caracter in texto:
-        if caracter.isalpha():
-            return True
-    return False
-
-
-# Valida un nombre de equipo o un nickname de jugador segun el punto 5.
-# Devuelve (True, "") si es valido, o (False, mensaje) si no lo es.
-def validar_nombre(nombre):
-    limpio = nombre.strip()
-
-    if limpio == "":
-        return False, "El nombre no puede estar vacio ni tener solo espacios."
-
-    if len(limpio) < LONGITUD_MIN_NOMBRE:
-        return False, f"El nombre debe tener al menos {LONGITUD_MIN_NOMBRE} caracteres."
-
-    if len(limpio) > LONGITUD_MAX_NOMBRE:
-        return False, f"El nombre no puede superar los {LONGITUD_MAX_NOMBRE} caracteres."
-
-    if solo_caracteres_permitidos(limpio) == False:
-        return False, "Solo se permiten letras, numeros y guion bajo (sin espacios ni simbolos)."
-
-    if tiene_al_menos_una_letra(limpio) == False:
-        return False, "El nombre no puede estar compuesto solo por numeros o guiones bajos."
-
-    return True, ""
-
-
-# ------------------------------------------------------------
-# Controles de duplicados
-# ------------------------------------------------------------
-
-# Indica si ya existe un equipo con ese nombre (comparacion normalizada).
-def existe_nombre_equipo(equipos, nombre):
-    buscado = normalizar_texto(nombre)
-    for equipo in equipos:
-        if normalizar_texto(equipo[1]) == buscado:
-            return True
-    return False
-
-
-# Indica si ya existe un jugador con ese nickname en TODO el torneo.
-# Esto cubre las dos reglas del punto 4: sin duplicados dentro del equipo
-# y sin un mismo jugador en dos equipos distintos.
-def existe_nickname(jugadores, nickname):
-    buscado = normalizar_texto(nickname)
-    for jugador in jugadores:
-        if normalizar_texto(jugador[1]) == buscado:
-            return True
-    return False
-
-
-# ------------------------------------------------------------
-# Pedido de datos con validacion
-# ------------------------------------------------------------
-
-# Pide un nombre de equipo hasta que sea valido y no este repetido.
-def pedir_nombre_equipo(equipos):
-    seguir = True
-    nombre = ""
-    while seguir == True:
-        nombre = input("Nombre del equipo: ").strip()
-        es_valido, mensaje = validar_nombre(nombre)
-
-        if es_valido == False:
-            print(f"Nombre invalido: {mensaje}")
-        elif existe_nombre_equipo(equipos, nombre):
-            print("Nombre invalido: ya existe un equipo con ese nombre.")
-        else:
-            seguir = False
-    return nombre
-
-
-# Pide un nickname hasta que sea valido y no este repetido en el torneo.
-def pedir_nickname(jugadores, numero_jugador):
-    seguir = True
-    nickname = ""
-    while seguir == True:
-        nickname = input(f"  Nickname del jugador {numero_jugador}: ").strip()
-        es_valido, mensaje = validar_nombre(nickname)
-
-        if es_valido == False:
-            print(f"  Nickname invalido: {mensaje}")
-        elif existe_nickname(jugadores, nickname):
-            print("  Nickname invalido: ese jugador ya esta registrado en el torneo.")
-        else:
-            seguir = False
-    return nickname
-
-
-# ------------------------------------------------------------
-# Punto 6: registrar un equipo completo
-# ------------------------------------------------------------
-
-# Registra UN equipo con sus 5 jugadores.
-# El equipo se agrega a la lista recien cuando los 5 jugadores son validos,
-# por eso los jugadores se juntan primero en una lista temporal.
-# Devuelve True si el alta se completo, False si no se pudo.
-def registrar_equipo(equipos, jugadores, matriz_stats, partidos_por_jugador,
-                     inscripcion_cerrada):
-    # Control de estado: no se registra nada si la inscripcion ya cerro.
-    if inscripcion_cerrada:
-        print("La inscripcion esta cerrada: el cuadro del torneo ya fue generado.")
-        return False
-
-    # Control de estado: no puede haber un noveno equipo.
-    if len(equipos) >= N_EQUIPOS:
-        print(f"Ya hay {N_EQUIPOS} equipos registrados. No se admiten mas.")
-        return False
-
-    codigo_equipo = f"E{len(equipos) + 1}"
-    print()
-    print(f"----- REGISTRO DEL EQUIPO {codigo_equipo} -----")
-
-    nombre_equipo = pedir_nombre_equipo(equipos)
-
-    # Los jugadores se cargan en una lista temporal.
-    # Si el alta se completa, recien ahi pasan a la lista definitiva.
-    nicknames_nuevos = []
-    for numero in range(1, N_JUGADORES + 1):
-        # Se valida contra los jugadores ya registrados MAS los de este equipo,
-        # para que no se repita un nickname dentro del mismo alta.
-        seguir = True
-        nickname = ""
-        while seguir == True:
-            nickname = pedir_nickname(jugadores, numero)
-            repetido = False
-            for cargado in nicknames_nuevos:
-                if normalizar_texto(cargado) == normalizar_texto(nickname):
-                    repetido = True
-            if repetido:
-                print("  Nickname invalido: ya lo cargaste en este mismo equipo.")
-            else:
-                seguir = False
-        nicknames_nuevos.append(nickname)
-
-    # Alta efectiva: el equipo se cierra con exactamente N_JUGADORES jugadores.
-    equipos.append((codigo_equipo, nombre_equipo))
-
-    for nickname in nicknames_nuevos:
-        codigo_jugador = "J" + str(len(jugadores) + 1).zfill(2)
-        jugadores.append((codigo_jugador, nickname, codigo_equipo))
-        # IMPORTANTE: cada jugador nuevo necesita su fila de estadisticas,
-        # para que el indice de jugadores y el de matriz_stats queden alineados.
-        agregar_fila_stats(matriz_stats, partidos_por_jugador)
-
-    print(f"Equipo {codigo_equipo} ({nombre_equipo}) registrado con {N_JUGADORES} jugadores.")
-    print(f"Equipos registrados: {len(equipos)} de {N_EQUIPOS}.")
-    return True
-
-
-# ------------------------------------------------------------
-# Menu 2: listar equipos y jugadores
-# ------------------------------------------------------------
-
-def listar_equipos_y_jugadores(equipos, jugadores):
-    print()
-    print("----- EQUIPOS Y JUGADORES -----")
-
-    if len(equipos) == 0:
-        print("Todavia no hay equipos registrados.")
-        return
-
-    for equipo in equipos:
-        codigo_equipo = equipo[0]
-        nombre_equipo = equipo[1]
-        print()
-        print(f"{codigo_equipo} - {nombre_equipo}")
-        for jugador in jugadores:
-            if jugador[2] == codigo_equipo:
-                print(f"   {jugador[0]}: {jugador[1]}")
-
-    print()
-    print(f"Total: {len(equipos)} equipos y {len(jugadores)} jugadores.")
