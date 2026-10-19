@@ -65,15 +65,13 @@ Ningún jugador pertenece simultáneamente a otro equipo.
 Ningún username está vacío.
 El equipo no supera los 5 integrantes en ningún momento de la carga.
 
-5. Definición de "nombre válido" (equipos y jugadores)
+## 5. Definición de "nombre válido" (equipos y jugadores)
 
-Se considera válido un nombre/username que cumpla las siguientes condiciones:
-
-No está vacío ni compuesto solo de espacios.
-Longitud mínima de 3 caracteres y máxima de 20.
-Contiene solo letras, números y guion bajo (sin símbolos ni espacios múltiples).
-Se normaliza antes de comparar o guardar (Para evitar que haya dos jugadores con el mismo nombre)
-No puede estar compuesto solo de números o guiones bajos.
+- No está vacío ni compuesto solo de espacios.
+- Longitud mínima de 3 caracteres y máxima de 20.
+- Contiene solo letras, números y guion bajo (sin símbolos ni espacios).
+- **Se normaliza antes de comparar y antes de guardar**: se quitan los espacios de los costados y se pasa a minúsculas. El valor que queda guardado es el normalizado, así "Sniper", " sniper " y "SNIPER" son el mismo nombre.
+- No puede estar compuesto solo de números o guiones bajos.
 
 
 6. Cierre de inscripción
@@ -84,15 +82,12 @@ Se cierra la inscripción.
 No se pueden registrar equipos nuevos ni modificar los existentes.
 El menú debe reflejar este estado (Punto 24).
 
-7. Reglas del sorteo de cuartos de final
+## 7. Reglas del sorteo de cuartos de final
 
-Se sortea sobre la lista completa de 8 equipos (`random.shuffle`).
-Cada equipo aparece exactamente una vez.
-Ningún equipo se enfrenta a sí mismo (garantizado por construcción, ya que se recorre la lista sorteada de a pares).
-Se generan exactamente 4 enfrentamientos, sin repetición.
-El sorteo se realiza una sola vez y se conserva durante toda la ejecución.
-
-Representación en el código: lista de 4 tuplas `(codigo_equipoA, codigo_equipoB)`.
+- Se sortea sobre los códigos de los 8 equipos (`random.shuffle` sobre una copia local).
+- Cada equipo aparece exactamente una vez y ningún equipo se enfrenta a sí mismo (se recorre la lista sorteada de a pares).
+- Se generan exactamente 4 enfrentamientos, una sola vez durante la ejecución.
+- **Los cruces se cargan directamente en los partidos 1 a 4** de las listas paralelas de partidos. No existe una estructura `llaves_cuartos` separada: hay una única fuente de información.
 
 8. Progresión del cuadro (semifinales y final)
 
@@ -103,19 +98,21 @@ Semifinal 2: ganador Cuarto 3 vs ganador Cuarto 4
 Final: ganador Semifinal 1 vs ganador Semifinal 2
 El ganador de la Final queda registrado como campeón del torneo.
 
-9. Estructura general de "partido"
+## 9. Estructura de los partidos
 
-Como el estado de un partido cambia durante la ejecución (pendiente → jugado, y en semis/final los participantes se completan después), se representa como **lista** (no tupla):
+Los 7 partidos se representan con **siete listas paralelas homogéneas**; el índice `i` identifica al mismo partido en todas:
 
-```
-partido = [id_partido, fase, equipoA, equipoB, rondas_A, rondas_B, jugado]
-```
+| Lista | Tipo | Valor mientras no se conoce |
+|---|---|---|
+| `partidos_id` | int (1 a 7) | — |
+| `partidos_fase` | str (una de `fases`) | — |
+| `partidos_equipoA` | str (código de equipo) | `""` |
+| `partidos_equipoB` | str (código de equipo) | `""` |
+| `partidos_rondasA` | int | `-1` |
+| `partidos_rondasB` | int | `-1` |
+| `partidos_jugado` | bool | `False` |
 
-- `equipoA` / `equipoB` son `None` en semis y final hasta que se resuelvan los partidos previos.
-- `jugado` es un booleano de control (ver punto 17).
-- Los 7 partidos viven en una lista `partidos`.
-
-Dentro de cada partido, el enfrentamiento ya definido `(equipoA, equipoB)` sí puede tratarse como tupla en el momento en que se conocen ambos participantes, porque en ese momento no deben cambiar.
+Al generar el cuadro se crean los 7 partidos: los cuartos con sus equipos reales y las semifinales y la final con `""`, que se completan con los ganadores.
 
 10. Datos que se cargan al finalizar un partido
 
@@ -144,22 +141,18 @@ donde `i` es el mismo índice que ocupa el jugador en la lista `jugadores`.
 - El usuario **nunca** ingresa el ganador manualmente.
 - Se calcula: `ganador = equipoA if rondas_A > rondas_B else equipoB`.
 
-13. Reglas válidas del marcador
+## 13. Reglas válidas del marcador
 
-Para esta etapa, regla simplificada (no se replica el reglamento oficial completo):
+Regla simplificada, sin prórroga: **gana el primer equipo que llega a 13 rondas**.
 
-- Ambos valores de rondas deben ser numéricos y no negativos.
-- No se admite empate (`rondas_A != rondas_B`); si ocurre, se rechaza la carga y se pide reingresar.
-- Rango sugerido: 0 a 24 rondas (para dejar margen a prórrogas), sin más restricciones que esa.
+- Ambos valores deben ser enteros no negativos.
+- Exactamente uno de los dos debe ser 13 (el ganador).
+- El otro debe ser menor a 13 (de 0 a 12).
+- Con esto quedan rechazados el empate (13-13), los marcadores de partidos no terminados (1-0, 12-10) y los valores por encima de 13.
 
-14. Control de carga única de partido
+## 14. Control de carga única de partido
 
-Antes de aceptar un resultado se valida:
-
-- El `id_partido` existe.
-- El partido **no fue cargado previamente** (`jugado == False`).
-- Ambos equipos corresponden efectivamente a ese partido (no se puede cargar un equipo que no está en ese cruce).
-- El marcador cumple las reglas del punto 13.
+Antes de aceptar un resultado se valida que el `id_partido` exista, que no haya sido cargado previamente, que sus dos equipos ya estén definidos (no se puede cargar una semifinal o la final antes de tiempo) y que el marcador cumpla el punto 13.
 
 15. Progresión automática del cuadro
 
@@ -198,9 +191,9 @@ Se documenta y aplica siempre de la misma manera, usando los valores **acumulado
 
 - Promedio de bajas por jugador del torneo: suma total de bajas de todos los jugadores con al menos un partido jugado, dividido esa cantidad de jugadores.
 
-20. Conteo explícito
+## 20. Conteo explícito
 
-- Cantidad de jugadores con KDA superior a 2.0 (umbral configurable en `datos.py`).
+Cantidad de jugadores con KDA superior a 2.0 (umbral configurable en `crear_configuracion()` de `datos.py`).
 
 21. Condición destacable del dominio
 
@@ -210,11 +203,11 @@ Se documenta y aplica siempre de la misma manera, usando los valores **acumulado
 
 - Buscar jugador por `código_jugador` o por `nickname` (búsqueda case-insensitive, normalizada igual que en el punto 5).
 
-23. Uso de compréhension, slicing y lambda
+## 23. Uso de comprensión, slicing y lambda
 
-- **Comprehension**: `kdas = [calcular_kda(j) for j in jugadores]` para construir la lista de KDA a partir de la matriz.
-- **Lambda**: `sorted(jugadores, key=lambda j: calcular_kda(j), reverse=True)` para el ranking.
-- **Slicing**: `top3 = ranking[:3]` para el informe de Top 3.
+- **Comprensión**: `kdas = [calcular_kda(matriz_stats, i) for i in range(len(jugadores))]`.
+- **Lambda**: `ranking.sort(key=lambda registro: registro[0], reverse=True)`, donde cada registro del ranking es la tupla `(kda, codigo_jugador, nickname, codigo_equipo)`.
+- **Slicing**: `ranking[:3]` para el Top 3.
 
 24. Menú principal
 
@@ -266,28 +259,36 @@ El menú no debe habilitar todas las opciones en cualquier momento:
 Todos los errores muestran un mensaje comprensible y permiten continuar operando sin cerrar el programa.
 
 ---
-
-Estructuras de datos — resumen final
+## Estructuras de datos — resumen final
 
 | Estructura | Contenido | Tipo |
 |---|---|---|
 | `equipos` | `(codigo_equipo, nombre_equipo)` × 8 | Lista de tuplas |
 | `jugadores` | `(codigo_jugador, nickname, codigo_equipo)` × 40 | Lista de tuplas |
-| `matriz_stats` | fila = jugador, columnas = bajas/muertes/asistencias acumuladas | Matriz numérica (lista de listas) |
-| `llaves_cuartos` | `(codigo_equipoA, codigo_equipoB)` × 4 | Lista de tuplas |
-| `partidos` | `[id, fase, equipoA, equipoB, rondas_A, rondas_B, jugado]` × 7 | Lista de listas |
+| `matriz_stats` | fila = jugador; columnas 0 = bajas, 1 = muertes, 2 = asistencias (acumuladas) | Matriz numérica |
+| `partidos_por_jugador` | partidos disputados por cada jugador (paralela a `jugadores`) | Lista de enteros |
+| `partidos_id`, `partidos_fase`, `partidos_equipoA`, `partidos_equipoB`, `partidos_rondasA`, `partidos_rondasB`, `partidos_jugado` | datos de los 7 partidos | 7 listas paralelas homogéneas |
+| ranking | `(kda, codigo_jugador, nickname, codigo_equipo)` | Lista de tuplas |
 | `fases` | `("Cuartos de Final", "Semifinal", "Final")` | Tupla fija |
 | `nombres_estadisticas` | `("Bajas", "Muertes", "Asistencias")` | Tupla fija |
 
-Módulos
+## Módulos
 
 ```
 proyecto_etapa1/
-├── main.py         # menú, estado del torneo, coordinación
-├── datos.py        # constantes (N_JUGADORES=5, N_EQUIPOS=8, umbrales), tuplas fijas, estructuras iniciales vacías
-├── operaciones.py  # validaciones, sorteo, carga de partidos, progresión de cuadro, KDA, informes, búsquedas
+├── main.py         # menú, entradas (input), mensajes y funciones de presentación (print)
+├── datos.py        # crear_configuracion(): devuelve las constantes y tuplas fijas (sin variables globales)
+├── operaciones.py  # validaciones, sorteo, carga de partidos, progresión, KDA, ranking, búsquedas
 └── README.md
 ```
 
+`operaciones.py` no usa `input()` ni `print()`: devuelve resultados y mensajes, y `main.py` los muestra.
 
+## Fuera de alcance (Etapa 1)
+
+- Persistencia en archivos: los datos se pierden al cerrar el programa.
+- Diccionarios y conjuntos.
+- Modificar o dar de baja equipos y jugadores ya registrados.
+- Partido por el tercer puesto, prórrogas y desempate del MVP.
+- Corrección de un resultado de partido ya cargado.
 
