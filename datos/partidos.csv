@@ -1,0 +1,8 @@
+id_partido;fase;fecha;equipo_a;equipo_b;rondas_a;rondas_b;jugado
+1;Cuartos de Final;10/10/2026;E3;E7;13;8;si
+2;Cuartos de Final;10/10/2026;E1;E5;13;9;si
+3;Cuartos de Final;11/10/2026;E8;E2;11;13;si
+4;Cuartos de Final;11/10/2026;E6;E4;13;5;si
+5;Semifinal;17/10/2026;E3;E1;10;13;si
+6;Semifinal;;E2;E6;-1;-1;no
+7;Final;;E1;;-1;-1;no

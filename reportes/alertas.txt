@@ -1,0 +1,6 @@
+Torneo: Copa Programación I
+Reporte: Alertas
+Filtro: ninguno
+
+A4 - Jugador con bajo rendimiento (1):
+  malbsmd (J32) tiene KDA acumulado 0.19

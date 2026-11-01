@@ -1,0 +1,21 @@
+{
+  "nombre_torneo": "Copa Programación I",
+  "cantidad_equipos": 8,
+  "jugadores_por_equipo": 5,
+  "fases": ["Cuartos de Final", "Semifinal", "Final"],
+  "cuadro": {"5": [1, 2], "6": [3, 4], "7": [5, 6]},
+  "rondas_para_ganar": 13,
+  "umbral_kda": 2.0,
+  "umbral_clutch": 3.0,
+  "umbral_kda_bajo": 0.5,
+  "archivos": {
+    "usuarios": "datos/usuarios.csv",
+    "equipos": "datos/equipos.csv",
+    "jugadores": "datos/jugadores.csv",
+    "partidos": "datos/partidos.csv",
+    "estadisticas": "datos/estadisticas.csv",
+    "reporte_filtrado": "reportes/reporte_filtrado.txt",
+    "reporte_general": "reportes/reporte_general.txt",
+    "alertas": "reportes/alertas.txt"
+  }
+}

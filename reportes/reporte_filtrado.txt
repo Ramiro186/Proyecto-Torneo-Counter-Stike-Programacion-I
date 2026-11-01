@@ -1,0 +1,15 @@
+Torneo: Copa Programación I
+Reporte: Filtrado por equipo
+Filtro: equipo E1
+
+----- EQUIPO E1: furia_cs -----
+Jugadores:
+  J01 kscerato: bajas 63, muertes 13, asistencias 18, KDA 6.23, partidos 2
+  J02 yuurih: bajas 18, muertes 28, asistencias 12, KDA 1.07, partidos 2
+  J03 fallen: bajas 21, muertes 27, asistencias 14, KDA 1.30, partidos 2
+  J04 molodoy: bajas 21, muertes 29, asistencias 7, KDA 0.97, partidos 2
+  J05 yekindar: bajas 19, muertes 31, asistencias 7, KDA 0.84, partidos 2
+Partidos:
+  Partido 2 (Cuartos de Final): furia_cs (E1) vs spirit_cs (E5) | 10/10/2026 | 13 - 9 | Ganador: furia_cs (E1)
+  Partido 5 (Semifinal): vitality_ez (E3) vs furia_cs (E1) | 17/10/2026 | 10 - 13 | Ganador: furia_cs (E1)
+  Partido 7 (Final): furia_cs (E1) vs por definir | pendiente

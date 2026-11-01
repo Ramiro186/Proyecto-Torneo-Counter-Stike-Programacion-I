@@ -294,6 +294,7 @@ Se validan seis formatos con `re.match` y las anclas `^` y `$`, para que el patr
 - **Fecha real:** la función `validar_fecha` separa día, mes y año con `split("/")`, los convierte con `int()` y compara el día contra los días del mes. Para febrero, el año es bisiesto si es divisible por 4 y no por 100, o si es divisible por 400. Se resuelve con lo visto en clase, sin módulos externos.
 - **Marcador (punto 13 de la etapa 1):** ambos valores enteros no negativos; exactamente uno es igual a `rondas_para_ganar` (13) y el otro está entre 0 y 12. Quedan rechazados el empate 13-13, los partidos no terminados (12-10) y los valores mayores a 13.
 - **Datos numéricos** (rondas, bajas, muertes, asistencias): se convierten con `int()` dentro de `try/except ValueError`, y después se controlan las reglas (marcador, valores no negativos, reglas del punto 10).
+- **Código de jugador en `estadisticas.csv`:** la función `leer_estadisticas(ruta)` solo recibe la ruta, no `config`, por lo que al leer cada fila controla únicamente el formato con `^J[0-9]{2}$` (`validar_formato_codigo_jugador`). Una fila que no lo cumple se descarta como incidencia (punto 6.4). Que el jugador exista y pertenezca a uno de los equipos del partido se controla después, con los jugadores ya cargados, en la coherencia del contenido (punto 6.3); si no se cumple, el programa informa el problema y termina. En `jugadores.csv` y al buscar por código, en cambio, `validar_codigo_jugador(codigo, config)` también comprueba el rango.
 - **Forma de las funciones de validación:** reciben el dato (y `config` si lo necesitan), devuelven el valor normalizado y lanzan `ValueError` con el mensaje del formato esperado. No usan `input` ni `print`, para poder probarlas con pytest. Los patrones se definen dentro de cada función, no como variables de módulo.
  
 ## 9. Manejo de excepciones
@@ -459,7 +460,7 @@ Se definen 23 pruebas unitarias automatizadas con pytest, que cubren los 7 casos
 | 2 | Inválido | Validación incorrecta con excepción | `test_nombre_sin_letras_lanza_error` | `validar_nombre` | `"___"` | Se lanza `ValueError` |
 | 3 | Inválido | Validación incorrecta con excepción | `test_fecha_inexistente_lanza_error` | `validar_fecha` | `"31/02/2026"` | Se lanza `ValueError` |
 | 4 | Inválido | Validación incorrecta con excepción | `test_empate_lanza_error` | `validar_marcador` | `13, 13` | Se lanza `ValueError` |
-| 5 | Límite | Valor exactamente igual al límite | `test_marcador_13_a_12_es_valido` | `validar_marcador` | `13, 12` | Se acepta, sin excepción |
+| 5 | Límite | Valor exactamente igual al límite | `test_marcador_13_a_12_es_valido` | `validar_marcador` | `13, 12, 13` | Se acepta, sin excepción |
 | 6 | Válido | Devolución etapa 2, punto 6 | `test_cuadro_con_claves_enteras` | `convertir_cuadro` | `{"5": [1, 2], "6": [3, 4], "7": [5, 6]}` | `{5: (1, 2), 6: (3, 4), 7: (5, 6)}` |
  
 ### 14.2 Cálculos y reglas del negocio (tests/test_operaciones.py)
@@ -530,7 +531,7 @@ def test_combinacion_duplicada_se_descarta():
     assert len(incidencias) == 1, "La fila repetida debería registrarse como incidencia"
 ```
  
-Ejecución. Se instala la librería una vez con `pip install pytest`. Luego, desde la carpeta `proyecto_etapa2/`, se ejecuta `python -m pytest -v`: la clase 12 recomienda esta forma para evitar problemas de PATH, y `-v` muestra el resultado de cada prueba.
+Ejecución. Se instala la librería una vez con `pip install pytest`. Luego, se ejecuta `python -m pytest -v`: la clase 12 recomienda esta forma para evitar problemas de PATH, y `-v` muestra el resultado de cada prueba.
  
 ```
 python -m pytest -v

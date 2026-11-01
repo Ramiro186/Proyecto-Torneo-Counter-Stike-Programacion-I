@@ -1,0 +1,86 @@
+Torneo: Copa Programación I
+Reporte: General
+Filtro: ninguno
+
+----- CUADRO DEL TORNEO -----
+Partido 1 (Cuartos de Final): vitality_ez (E3) vs g2_esports (E7) | 10/10/2026 | 13 - 8 | Ganador: vitality_ez (E3)
+Partido 2 (Cuartos de Final): furia_cs (E1) vs spirit_cs (E5) | 10/10/2026 | 13 - 9 | Ganador: furia_cs (E1)
+Partido 3 (Cuartos de Final): astralis_dk (E8) vs navi_gg (E2) | 11/10/2026 | 11 - 13 | Ganador: navi_gg (E2)
+Partido 4 (Cuartos de Final): mouz_cs (E6) vs faze_clan (E4) | 11/10/2026 | 13 - 5 | Ganador: mouz_cs (E6)
+Partido 5 (Semifinal): vitality_ez (E3) vs furia_cs (E1) | 17/10/2026 | 10 - 13 | Ganador: furia_cs (E1)
+Partido 6 (Semifinal): navi_gg (E2) vs mouz_cs (E6) | pendiente
+Partido 7 (Final): furia_cs (E1) vs por definir | pendiente
+
+----- RANKING DE JUGADORES POR KDA -----
+1. kscerato (J01) - equipo E1 - KDA: 6.23  [CLUTCH]
+2. jimpphat (J29) - equipo E6 - KDA: 2.38
+3. torzsi (J28) - equipo E6 - KDA: 2.00
+4. xertion (J30) - equipo E6 - KDA: 2.00
+5. snax_pl (J33) - equipo E7 - KDA: 2.00
+6. huntr (J31) - equipo E7 - KDA: 1.83
+7. jl_cs (J08) - equipo E2 - KDA: 1.77
+8. b1t (J07) - equipo E2 - KDA: 1.71
+9. donk (J22) - equipo E5 - KDA: 1.64
+10. zywoo (J12) - equipo E3 - KDA: 1.57
+11. flamez (J14) - equipo E3 - KDA: 1.54
+12. cadian (J38) - equipo E8 - KDA: 1.53
+13. ropz (J13) - equipo E3 - KDA: 1.52
+14. wonderful (J10) - equipo E2 - KDA: 1.50
+15. mezii (J15) - equipo E3 - KDA: 1.42
+16. spinx (J27) - equipo E6 - KDA: 1.40
+17. karrigan (J16) - equipo E4 - KDA: 1.38
+18. rain_no (J18) - equipo E4 - KDA: 1.38
+19. hooxi (J34) - equipo E7 - KDA: 1.36
+20. jabbi (J40) - equipo E8 - KDA: 1.33
+21. apex_fr (J11) - equipo E3 - KDA: 1.32
+22. device (J36) - equipo E8 - KDA: 1.31
+23. zont1x (J24) - equipo E5 - KDA: 1.31
+24. brollan (J26) - equipo E6 - KDA: 1.30
+25. fallen (J03) - equipo E1 - KDA: 1.30
+26. im_cs (J09) - equipo E2 - KDA: 1.27
+27. staehr (J37) - equipo E8 - KDA: 1.27
+28. aleksib (J06) - equipo E2 - KDA: 1.21
+29. nexa_cs (J35) - equipo E7 - KDA: 1.15
+30. br0_dk (J39) - equipo E8 - KDA: 1.15
+31. sh1ro (J23) - equipo E5 - KDA: 1.14
+32. chopper (J21) - equipo E5 - KDA: 1.13
+33. yuurih (J02) - equipo E1 - KDA: 1.07
+34. magixx (J25) - equipo E5 - KDA: 1.07
+35. broky (J19) - equipo E4 - KDA: 1.00
+36. twistzz (J20) - equipo E4 - KDA: 1.00
+37. molodoy (J04) - equipo E1 - KDA: 0.97
+38. frozen (J17) - equipo E4 - KDA: 0.92
+39. yekindar (J05) - equipo E1 - KDA: 0.84
+40. malbsmd (J32) - equipo E7 - KDA: 0.19
+
+----- TOP 3 DE JUGADORES POR KDA -----
+1. kscerato (J01) - KDA: 6.23
+2. jimpphat (J29) - KDA: 2.38
+3. torzsi (J28) - KDA: 2.00
+
+----- MVP DEL TORNEO -----
+kscerato (J01) - equipo E1 - KDA: 6.23
+
+----- EQUIPO MÁS LETAL -----
+furia_cs (E1) con 142 bajas
+
+----- RESUMEN GENERAL DEL TORNEO -----
+Partidos jugados: 5 de 7
+  Cuartos de Final: 4 de 4
+  Semifinal: 1 de 2
+  Final: 0 de 1
+Equipos eliminados: 5
+  vitality_ez (E3)
+  faze_clan (E4)
+  spirit_cs (E5)
+  g2_esports (E7)
+  astralis_dk (E8)
+Promedio de bajas por jugador: 16.20
+Jugadores con KDA mayor a 2.0: 2
+Jugadores clutch: 1
+
+----- RESUMEN DE ÚNICOS -----
+Jugadores distintos que jugaron: 40 (J01, J02, J03, J04, J05, J06, J07, J08, J09, J10, J11, J12, J13, J14, J15, J16, J17, J18, J19, J20, J21, J22, J23, J24, J25, J26, J27, J28, J29, J30, J31, J32, J33, J34, J35, J36, J37, J38, J39, J40)
+Equipos con al menos una victoria: 4 (E1, E2, E3, E6)
+Equipos eliminados: 5 (E3, E4, E5, E7, E8)
+Jugadores clutch: 1 (J01)

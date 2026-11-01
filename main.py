@@ -1,464 +1,406 @@
 # ------------------------------------------------------------
-# main.py - Menu, entradas del usuario y presentacion
+# main.py - Login, menú, entradas del usuario y presentación
 # ------------------------------------------------------------
-# Aca se concentran input() y print(). La logica vive en operaciones.py
-# y la configuracion en datos.py (se obtiene con una funcion, sin variables globales).
+# Único módulo con input() y print(). La lógica vive en operaciones.py
+# y validaciones.py, los textos en reportes.py y los archivos en archivos.py.
 
-import datos
+import archivos
 import operaciones
+import reportes
+import validaciones
 
 
 # ============================================================
 # Entrada de datos
 # ============================================================
 
-# Pide un numero entero por consola de forma segura.
-# Si el usuario escribe algo que no es un entero, avisa y vuelve a pedir.
-def pedir_entero(mensaje):
-    seguir = True
-    numero = 0
-    while seguir == True:
-        texto = input(mensaje)
-        # strip() saca espacios de los costados; lstrip("-") saca un signo menos inicial
-        # para poder aceptar negativos y que isdigit los reconozca.
-        limpio = texto.strip()
-        if limpio.lstrip("-").isdigit():
-            numero = int(limpio)
-            seguir = False
-        else:
-            print("Entrada invalida: escribi un numero entero.")
-    return numero
-
-
-# Pide un entero mayor o igual a cero (se usa para bajas, muertes y asistencias).
-def pedir_entero_no_negativo(mensaje):
-    seguir = True
-    valor = 0
-    while seguir == True:
-        valor = pedir_entero(mensaje)
-        if valor < 0:
-            print("Valor invalido: no puede ser negativo.")
-        else:
-            seguir = False
+def pedir_dato(mensaje, validar):
+    '''Pide un dato hasta que la función validar lo acepte y retorna lo que ella devuelve.'''
+    valor = None
+    valido = False
+    while not valido:
+        try:
+            valor = validar(input(mensaje))
+            valido = True
+        except ValueError as error:
+            print(f"Dato inválido: {error}.")
     return valor
 
 
-# Pide un nombre de equipo hasta que sea valido y no este repetido.
-# Devuelve el nombre ya normalizado (asi se guarda).
-def pedir_nombre_equipo(equipos, longitud_min, longitud_max):
-    seguir = True
-    nombre = ""
-    while seguir == True:
-        nombre = input("Nombre del equipo: ")
-        es_valido, mensaje = operaciones.validar_nombre(nombre, longitud_min, longitud_max)
-        if es_valido == False:
-            print(f"Nombre invalido: {mensaje}")
-        elif operaciones.existe_nombre_equipo(equipos, nombre):
-            print("Nombre invalido: ya existe un equipo con ese nombre.")
-        else:
-            seguir = False
-    return operaciones.normalizar_texto(nombre)
+def pedir_entero(mensaje):
+    '''Pide un número entero no negativo hasta que sea válido.'''
+    return pedir_dato(mensaje, validaciones.validar_entero_no_negativo)
 
 
-# Pide los nicknames del equipo en curso y los junta en una lista TEMPORAL.
-# Cada nickname debe ser valido, no existir en el torneo y no repetirse en este mismo equipo.
-# Las estructuras definitivas no se tocan aca: eso lo hace operaciones.registrar_equipo.
-def pedir_nicknames_equipo(jugadores, n_jugadores, longitud_min, longitud_max):
-    nicknames_nuevos = []
-    for numero in range(1, n_jugadores + 1):
-        seguir = True
-        nickname = ""
-        while seguir == True:
-            nickname = input(f"  Nickname del jugador {numero}/{n_jugadores}: ")
-            es_valido, mensaje = operaciones.validar_nombre(nickname, longitud_min, longitud_max)
-            if es_valido == False:
-                print(f"  Nickname invalido: {mensaje}")
-            elif operaciones.existe_nickname(jugadores, nickname):
-                print("  Nickname invalido: ese jugador ya esta registrado en el torneo.")
-            elif operaciones.nickname_repetido_en_alta(nicknames_nuevos, nickname):
-                print("  Nickname invalido: ya lo cargaste en este mismo equipo.")
-            else:
-                seguir = False
-        nicknames_nuevos.append(operaciones.normalizar_texto(nickname))
-    return nicknames_nuevos
+def pedir_marcador(partido, config):
+    '''Pide las rondas de los dos equipos hasta que el marcador sea válido.'''
+    marcador = None
+    while marcador is None:
+        rondas_a = pedir_entero(f"Rondas de {partido['equipo_a']}: ")
+        rondas_b = pedir_entero(f"Rondas de {partido['equipo_b']}: ")
+        try:
+            marcador = validaciones.validar_marcador(rondas_a, rondas_b, config["rondas_para_ganar"])
+        except ValueError as error:
+            print(f"Marcador inválido: {error}.")
+    return marcador
 
 
-# Pide bajas, muertes y asistencias de los 5 jugadores de un equipo y las acumula.
-def pedir_estadisticas_equipo(jugadores, matriz_stats, partidos_por_jugador,
-                              codigo_equipo, nombres_estadisticas):
-    print()
-    print(f"--- Estadisticas del equipo {codigo_equipo} ---")
-    for i in operaciones.indices_de_equipo(jugadores, codigo_equipo):
-        print(f"Jugador {jugadores[i][0]} ({jugadores[i][1]}):")
-        bajas = pedir_entero_no_negativo(f"  {nombres_estadisticas[0]}: ")
-        muertes = pedir_entero_no_negativo(f"  {nombres_estadisticas[1]}: ")
-        asistencias = pedir_entero_no_negativo(f"  {nombres_estadisticas[2]}: ")
-        operaciones.acumular_stats(matriz_stats, partidos_por_jugador, i,
-                                   bajas, muertes, asistencias)
+def pedir_fecha_partido(id_partido, torneo):
+    '''Pide la fecha de un partido hasta que sea real y respete el orden del cuadro.'''
+    partidos = torneo["partidos"]
+    cuadro = torneo["config"]["cuadro"]
+    return pedir_dato("Fecha del partido (DD/MM/AAAA): ",
+                      lambda texto: validaciones.validar_orden_fechas(validaciones.validar_fecha(texto), id_partido, partidos, cuadro))
+
+
+def pedir_planilla_equipo(id_partido, codigo_equipo, rondas_totales, torneo):
+    '''Pide bajas, muertes y asistencias de los jugadores de un equipo y retorna sus filas.'''
+    filas = []
+    print(f"--- Estadísticas de {reportes.texto_equipo(codigo_equipo, torneo['equipos'])} ---")
+    for jugador in operaciones.jugadores_de_equipo(torneo["jugadores"], codigo_equipo):
+        print(f"Jugador {jugador['codigo_jugador']} ({jugador['nickname']}):")
+        bajas = pedir_entero("  Bajas: ")
+        muertes = pedir_dato("  Muertes: ",
+                             lambda texto: validaciones.validar_muertes_posibles(validaciones.validar_entero_no_negativo(texto), rondas_totales))
+        asistencias = pedir_entero("  Asistencias: ")
+        filas.append({"id_partido": id_partido, "codigo_jugador": jugador["codigo_jugador"],
+                      "bajas": bajas, "muertes": muertes, "asistencias": asistencias})
+    return filas
 
 
 # ============================================================
-# Presentacion
+# Presentación
 # ============================================================
 
-# Muestra el menu reflejando el estado actual del torneo (punto 26).
-def mostrar_menu(cantidad_equipos, n_equipos, inscripcion_cerrada, cuadro_generado, hay_jugados):
-    if inscripcion_cerrada:
-        estado_inscripcion = "[INSCRIPCION CERRADA]"
-    elif cantidad_equipos >= n_equipos:
-        estado_inscripcion = f"[CUPO COMPLETO {cantidad_equipos}/{n_equipos}]"
-    else:
-        estado_inscripcion = f"[{cantidad_equipos}/{n_equipos} inscriptos]"
-
-    if cuadro_generado:
-        estado_cuadro = "[YA GENERADO]"
-    elif cantidad_equipos < n_equipos:
-        estado_cuadro = f"[requiere {n_equipos} equipos]"
-    else:
-        estado_cuadro = "[DISPONIBLE]"
-
-    if cuadro_generado:
-        estado_partidos = ""
-    else:
-        estado_partidos = "[requiere cuadro generado]"
-
-    if hay_jugados:
-        estado_informes = ""
-    else:
-        estado_informes = "[requiere partidos jugados]"
-
+def mostrar_lineas(lineas):
+    '''Muestra en pantalla las líneas de un informe.'''
     print()
-    print("===== TORNEO COUNTER STRIKE =====")
-    print(f"1. Registrar equipo (con sus 5 jugadores) {estado_inscripcion}")
-    print("2. Listar equipos y jugadores")
-    print(f"3. Generar cuadro de cuartos de final (sorteo) {estado_cuadro}")
-    print(f"4. Consultar cuadro del torneo {estado_partidos}")
-    print(f"5. Cargar resultado y estadisticas de un partido {estado_partidos}")
-    print("6. Buscar jugador / equipo")
-    print(f"7. Consultar rankings (general y Top 3) {estado_informes}")
-    print(f"8. Consultar estadisticas e informes {estado_informes}")
-    print("9. Salir")
+    for linea in lineas:
+        print(linea)
 
 
-# Listado de equipos con sus jugadores.
-def mostrar_equipos_y_jugadores(equipos, jugadores):
+def texto_estado(torneo):
+    '''Retorna el estado del torneo que se muestra en el encabezado del menú.'''
+    config = torneo["config"]
+    campeon = operaciones.obtener_campeon(torneo["partidos"], config["cuadro"])
+    if campeon != "":
+        return f"Torneo finalizado — Campeón: {torneo['equipos'][campeon]['nombre_equipo']}"
+    elif len(torneo["partidos"]) > 0:
+        return "Inscripción cerrada — Torneo en curso"
+    return f"Inscripción abierta: {len(torneo['equipos'])}/{config['cantidad_equipos']} equipos"
+
+
+def mostrar_menu(torneo):
+    '''Muestra el menú según el rol del usuario y el estado del torneo.'''
+    opciones = (("1", "Registrar equipo (con sus 5 jugadores)"),
+                ("2", "Listar equipos y jugadores"),
+                ("3", "Generar cuadro de cuartos de final (sorteo)"),
+                ("4", "Consultar cuadro del torneo"),
+                ("5", "Cargar resultado y estadísticas de un partido"),
+                ("6", "Buscar jugador / equipo"),
+                ("7", "Consultar rankings (general y Top 3)"),
+                ("8", "Consultar estadísticas e informes"),
+                ("9", "Reporte filtrado (equipo / fase / fecha)"),
+                ("10", "Reporte general y alertas"),
+                ("0", "Salir"))
+    usuario = torneo["usuario_actual"]
     print()
-    print("----- EQUIPOS Y JUGADORES -----")
-    if len(equipos) == 0:
-        print("Todavia no hay equipos registrados.")
-        return
-    for equipo in equipos:
-        print()
-        print(f"{equipo[0]} - {equipo[1]}")
-        for i in operaciones.indices_de_equipo(jugadores, equipo[0]):
-            print(f"   {jugadores[i][0]}: {jugadores[i][1]}")
-    print()
-    print(f"Total: {len(equipos)} equipos y {len(jugadores)} jugadores.")
-
-
-# Informe 1: estado completo del cuadro del torneo.
-def mostrar_cuadro(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
-                   partidos_rondasA, partidos_rondasB, partidos_jugado, campeon):
-    print()
-    print("----- CUADRO DEL TORNEO -----")
-    for i in range(len(partidos_id)):
-        # Si un equipo todavia no esta definido, se muestra "?" en vez de vacio.
-        if partidos_equipoA[i] == "":
-            equipoA = "?"
+    print(f"===== {torneo['config']['nombre_torneo']} =====")
+    print(f"Usuario: {usuario['usuario']} ({usuario['rol']}) | {texto_estado(torneo)}")
+    for numero, texto in opciones:
+        motivo = operaciones.motivo_no_disponible(numero, torneo)
+        if motivo == "":
+            print(f"{numero}. {texto}")
         else:
-            equipoA = partidos_equipoA[i]
-        if partidos_equipoB[i] == "":
-            equipoB = "?"
-        else:
-            equipoB = partidos_equipoB[i]
-
-        if partidos_jugado[i]:
-            marcador = f"{partidos_rondasA[i]} - {partidos_rondasB[i]}"
-        else:
-            marcador = "pendiente"
-
-        print(f"Partido {partidos_id[i]} ({partidos_fase[i]}): {equipoA} vs {equipoB}  [{marcador}]")
-
-    if campeon == "":
-        print("Campeon: aun no definido.")
-    else:
-        print(f"Campeon del torneo: {campeon}")
+            print(f"{numero}. {texto} (no disponible: {motivo})")
 
 
-# Ficha de un jugador buscado por codigo o nickname.
-def mostrar_jugador(jugadores, matriz_stats, partidos_por_jugador, texto_buscado,
-                    nombres_estadisticas, umbral_clutch):
-    indice = operaciones.buscar_indice_jugador(jugadores, texto_buscado)
-    if indice == -1:
-        print(f"No existe un jugador con codigo o nickname '{texto_buscado}'.")
-        return
-
-    bajas, muertes, asistencias = operaciones.obtener_stats(matriz_stats, indice)
-    print()
-    print(f"----- JUGADOR {jugadores[indice][0]}: {jugadores[indice][1]} -----")
-    print(f"Equipo: {jugadores[indice][2]}")
-    print(f"Partidos disputados: {partidos_por_jugador[indice]}")
-    print(f"{nombres_estadisticas[0]}: {bajas}")
-    print(f"{nombres_estadisticas[1]}: {muertes}")
-    print(f"{nombres_estadisticas[2]}: {asistencias}")
-
-    if operaciones.jugo_algun_partido(partidos_por_jugador, indice):
-        kda = operaciones.calcular_kda(matriz_stats, indice)
-        print(f"KDA acumulado: {kda:.2f}")
-        if operaciones.es_clutch(kda, umbral_clutch):
-            print(f"Condicion: JUGADOR CLUTCH (KDA >= {umbral_clutch})")
-    else:
-        print("KDA acumulado: sin partidos disputados.")
-
-
-# Ficha de un equipo buscado por codigo: nombre, jugadores y partidos donde aparece.
-def mostrar_equipo(equipos, jugadores, partidos_id, partidos_fase,
-                   partidos_equipoA, partidos_equipoB, codigo_buscado):
-    indice = operaciones.buscar_indice_equipo(equipos, codigo_buscado)
-    if indice == -1:
-        print(f"No existe un equipo con codigo '{codigo_buscado}'.")
-        return
-
-    codigo_equipo = equipos[indice][0]
-    print()
-    print(f"----- EQUIPO {codigo_equipo}: {equipos[indice][1]} -----")
-
-    print("Jugadores:")
-    for i in operaciones.indices_de_equipo(jugadores, codigo_equipo):
-        print(f"  - {jugadores[i][0]}: {jugadores[i][1]}")
-
-    print("Partidos en el cuadro:")
-    indices_partidos = operaciones.indices_partidos_de_equipo(partidos_equipoA, partidos_equipoB,
-                                                              codigo_equipo)
-    if len(indices_partidos) == 0:
-        print("  (todavia no aparece en ningun partido)")
-    for i in indices_partidos:
-        print(f"  - Partido {partidos_id[i]} ({partidos_fase[i]})")
-
-
-# Informe 2: ranking completo por KDA (marca a los jugadores clutch).
-def mostrar_ranking_completo(ranking, umbral_clutch):
-    print()
-    print("----- RANKING DE JUGADORES POR KDA -----")
-    posicion = 1
-    for registro in ranking:
-        if operaciones.es_clutch(registro[0], umbral_clutch):
-            marca = "  [CLUTCH]"
-        else:
-            marca = ""
-        print(f"{posicion}. {registro[2]} ({registro[1]}) - equipo {registro[3]} - KDA: {registro[0]:.2f}{marca}")
-        posicion = posicion + 1
-
-
-# Informe 3: Top 3 por KDA.
-def mostrar_top3(ranking):
-    print()
-    print("----- TOP 3 DE JUGADORES POR KDA -----")
-    posicion = 1
-    for registro in operaciones.obtener_top3(ranking):
-        print(f"{posicion}. {registro[2]} ({registro[1]}) - KDA: {registro[0]:.2f}")
-        posicion = posicion + 1
-
-
-# Informe 4: MVP del torneo (con empates).
-def mostrar_mvp(ranking):
-    print()
-    print("----- MVP DEL TORNEO -----")
-    mvps = operaciones.obtener_mvp(ranking)
-    if len(mvps) == 1:
-        registro = mvps[0]
-        print(f"MVP: {registro[2]} ({registro[1]}) - equipo {registro[3]} - KDA: {registro[0]:.2f}")
-    else:
-        print(f"Hay {len(mvps)} jugadores empatados con KDA {mvps[0][0]:.2f}:")
-        for registro in mvps:
-            print(f"  - {registro[2]} ({registro[1]}) - equipo {registro[3]}")
-
-
-# Informe 5: equipo mas letal (con empates).
-def mostrar_equipo_mas_letal(equipos, jugadores, matriz_stats):
-    print()
-    print("----- EQUIPO MAS LETAL -----")
-    mejor_total, empatados = operaciones.obtener_equipos_mas_letales(equipos, jugadores, matriz_stats)
-    if mejor_total <= 0:
-        print("Todavia no hay bajas cargadas en el torneo.")
-    elif len(empatados) == 1:
-        print(f"{empatados[0][1]} ({empatados[0][0]}) con {mejor_total} bajas.")
-    else:
-        print(f"Hay {len(empatados)} equipos empatados con {mejor_total} bajas:")
-        for equipo in empatados:
-            print(f"  - {equipo[1]} ({equipo[0]})")
-
-
-# Informe 6: resumen general del torneo.
-def mostrar_resumen_general(equipos, matriz_stats, partidos_por_jugador,
-                            partidos_equipoA, partidos_equipoB,
-                            partidos_rondasA, partidos_rondasB, partidos_jugado, umbral_kda):
-    print()
-    print("----- RESUMEN GENERAL DEL TORNEO -----")
-
-    jugados = operaciones.contar_partidos_jugados(partidos_jugado)
-    print(f"Partidos jugados: {jugados} de {len(partidos_jugado)}")
-
-    eliminados = operaciones.equipos_eliminados(partidos_equipoA, partidos_equipoB,
-                                                partidos_rondasA, partidos_rondasB, partidos_jugado)
-    if len(eliminados) == 0:
-        print("Equipos eliminados: ninguno todavia.")
-    else:
-        print(f"Equipos eliminados ({len(eliminados)}):")
-        for codigo in eliminados:
-            indice_equipo = operaciones.buscar_indice_equipo(equipos, codigo)
-            print(f"  - {equipos[indice_equipo][1]} ({codigo})")
-
-    promedio = operaciones.promedio_bajas_por_jugador(matriz_stats, partidos_por_jugador)
-    print(f"Promedio de bajas por jugador: {promedio:.2f}")
-
-    cantidad = operaciones.contar_kda_superior(matriz_stats, partidos_por_jugador, umbral_kda)
-    print(f"Jugadores con KDA mayor a {umbral_kda}: {cantidad}")
+def actualizar_alertas(torneo):
+    '''Recalcula las alertas, las escribe en alertas.txt y retorna la lista.'''
+    config = torneo["config"]
+    alertas = operaciones.detectar_alertas(torneo["partidos"], torneo["jugadores"], torneo["estadisticas"],
+                                           torneo["incidencias"], config)
+    archivos.escribir_lineas(config["archivos"]["alertas"], reportes.lineas_alertas(config["nombre_torneo"], alertas))
+    return alertas
 
 
 # ============================================================
-# Funcion principal
+# Opciones del menú
 # ============================================================
+
+def registrar_equipo(torneo):
+    '''Opción 1: pide un equipo con sus jugadores, lo guarda y recién después lo agrega a la memoria.'''
+    config = torneo["config"]
+    equipos = torneo["equipos"]
+    jugadores = torneo["jugadores"]
+    print()
+    print(f"----- REGISTRO DEL EQUIPO E{len(equipos) + 1} -----")
+    nombres = operaciones.nombres_registrados(equipos)
+    nombre = pedir_dato("Nombre del equipo: ",
+                        lambda texto: validaciones.validar_no_repetido(validaciones.validar_nombre(texto), nombres, "un equipo"))
+
+    registrados = operaciones.nicknames_registrados(jugadores)
+    nicknames = []
+    for numero in range(1, config["jugadores_por_equipo"] + 1):
+        nickname = pedir_dato(f"  Nickname del jugador {numero}/{config['jugadores_por_equipo']}: ",
+                              lambda texto: validaciones.validar_no_repetido(validaciones.validar_nombre(texto), registrados, "un jugador"))
+        registrados.add(nickname)
+        nicknames.append(nickname)
+
+    equipo, jugadores_nuevos = operaciones.armar_equipo(nombre, nicknames, equipos, jugadores, config)
+    archivos.registrar_equipo_en_archivos(config["archivos"]["equipos"], config["archivos"]["jugadores"],
+                                          equipo, jugadores_nuevos, jugadores)
+    equipos[equipo["codigo_equipo"]] = equipo
+    for jugador in jugadores_nuevos:
+        jugadores[jugador["codigo_jugador"]] = jugador
+    print(f"Equipo {equipo['codigo_equipo']} registrado con {len(jugadores_nuevos)} jugadores.")
+
+
+def generar_cuadro(torneo):
+    '''Opción 3: sortea los cuartos, guarda el cuadro y cierra la inscripción.'''
+    config = torneo["config"]
+    partidos = operaciones.generar_partidos(operaciones.sortear_equipos(torneo["equipos"]), config)
+    archivos.guardar_partidos(config["archivos"]["partidos"], partidos)
+    torneo["partidos"] = partidos
+    print("Cuadro generado. La inscripción quedó cerrada.")
+    mostrar_lineas(reportes.lineas_cuadro(partidos, torneo["equipos"], ""))
+
+
+def cargar_partido(torneo):
+    '''Opción 5: pide resultado y planilla, valida, guarda y recién después actualiza la memoria.'''
+    config = torneo["config"]
+    print()
+    print("Partidos disponibles para cargar:")
+    for partido in operaciones.partidos_cargables(torneo["partidos"]):
+        print(reportes.texto_partido(partido, torneo["equipos"]))
+
+    id_partido = pedir_entero("Id del partido a cargar: ")
+    partido = validaciones.validar_partido_cargable(id_partido, torneo["partidos"])
+    rondas_a, rondas_b = pedir_marcador(partido, config)
+    fecha = pedir_fecha_partido(id_partido, torneo)
+    rondas_totales = rondas_a + rondas_b
+    filas = (pedir_planilla_equipo(id_partido, partido["equipo_a"], rondas_totales, torneo)
+             + pedir_planilla_equipo(id_partido, partido["equipo_b"], rondas_totales, torneo))
+
+    partidos_nuevos = operaciones.preparar_carga_partido(id_partido, fecha, rondas_a, rondas_b, filas, torneo)
+    archivos.registrar_partido_en_archivos(config["archivos"]["estadisticas"], config["archivos"]["partidos"],
+                                           filas, partidos_nuevos, torneo["estadisticas"])
+    torneo["partidos"] = partidos_nuevos
+    torneo["estadisticas"] = torneo["estadisticas"] + filas
+
+    ganador = operaciones.determinar_ganador(partidos_nuevos[id_partido])
+    print(f"Resultado del partido {id_partido} cargado. Ganador: {reportes.texto_equipo(ganador, torneo['equipos'])}.")
+    campeon = operaciones.obtener_campeon(partidos_nuevos, config["cuadro"])
+    if campeon != "":
+        print(f"El torneo terminó. Campeón: {reportes.texto_equipo(campeon, torneo['equipos'])}.")
+
+
+def buscar(torneo):
+    '''Opción 6: busca un jugador por código o por nickname (recursiva), o un equipo por código.'''
+    config = torneo["config"]
+    print()
+    print("1. Buscar jugador por código")
+    print("2. Buscar jugador por nickname")
+    print("3. Buscar equipo por código")
+    sub = input("Qué querés buscar: ").strip()
+
+    if sub == "1" or sub == "2":
+        if sub == "1":
+            codigo = validaciones.validar_codigo_jugador(input("Código del jugador: ").strip().upper(), config)
+            jugador = operaciones.buscar_por_codigo(torneo["jugadores"], codigo)
+        else:
+            nickname = input("Nickname del jugador: ").strip().lower()
+            jugador = operaciones.buscar_jugador_recursivo(list(torneo["jugadores"].values()), nickname)
+        if jugador is None:
+            print("No se encontró el jugador.")
+        else:
+            stats = operaciones.acumular_stats_por_jugador(torneo["estadisticas"])
+            mostrar_lineas(reportes.lineas_ficha_jugador(jugador, stats, torneo["equipos"], config["umbral_clutch"]))
+    elif sub == "3":
+        codigo = validaciones.validar_codigo_equipo(input("Código del equipo: ").strip().upper(), config)
+        if operaciones.buscar_por_codigo(torneo["equipos"], codigo) is None:
+            print("No se encontró el equipo.")
+        else:
+            mostrar_lineas(reportes.lineas_datos_equipo(operaciones.reporte_por_equipo(codigo, torneo), torneo["equipos"]))
+    else:
+        print("Opción inválida: elegí 1, 2 o 3.")
+
+
+def mostrar_informe(opcion, torneo):
+    '''Opciones 7 y 8: muestra rankings o estadísticas e informes.'''
+    datos = operaciones.reporte_general(torneo)
+    if opcion == "7":
+        mostrar_lineas(reportes.lineas_rankings(datos))
+    else:
+        mostrar_lineas(reportes.lineas_informes(datos, torneo["equipos"], torneo["config"]["umbral_kda"]))
+
+
+def lineas_filtro_equipo(torneo):
+    '''Pide un equipo y retorna las líneas de su reporte, o [] si no existe.'''
+    config = torneo["config"]
+    codigo = validaciones.validar_codigo_equipo(input("Código del equipo: ").strip().upper(), config)
+    if operaciones.buscar_por_codigo(torneo["equipos"], codigo) is None:
+        print("No se encontró el equipo.")
+        return []
+    datos = operaciones.reporte_por_equipo(codigo, torneo)
+    return reportes.lineas_reporte_equipo(config["nombre_torneo"], datos, torneo["equipos"])
+
+
+def lineas_filtro_fase(torneo):
+    '''Pide una fase y retorna las líneas de su reporte, o [] si la opción no existe.'''
+    config = torneo["config"]
+    fases = config["fases"]
+    for i in range(len(fases)):
+        print(f"{i + 1}. {fases[i]}")
+    numero = pedir_entero("Fase: ")
+    if numero < 1 or numero > len(fases):
+        print("Opción inválida: esa fase no existe.")
+        return []
+    fase = fases[numero - 1]
+    partidos_fase = operaciones.reporte_por_fase(fase, torneo["partidos"])
+    return reportes.lineas_reporte_fase(config["nombre_torneo"], fase, partidos_fase, torneo["equipos"])
+
+
+def lineas_filtro_fecha(torneo):
+    '''Pide una fecha y retorna las líneas de su reporte.'''
+    fecha = pedir_dato("Fecha (DD/MM/AAAA): ", validaciones.validar_fecha)
+    resultados = operaciones.reporte_por_fecha(fecha, torneo)
+    return reportes.lineas_reporte_fecha(torneo["config"]["nombre_torneo"], fecha, resultados, torneo["equipos"])
+
+
+def reporte_filtrado(torneo):
+    '''Opción 9: pide el filtro, muestra el reporte y lo escribe en reporte_filtrado.txt.'''
+    print()
+    print("1. Filtrar por equipo")
+    print("2. Filtrar por fase")
+    print("3. Filtrar por fecha")
+    sub = input("Filtro: ").strip()
+    lineas = []
+    if sub == "1":
+        lineas = lineas_filtro_equipo(torneo)
+    elif sub == "2":
+        lineas = lineas_filtro_fase(torneo)
+    elif sub == "3":
+        lineas = lineas_filtro_fecha(torneo)
+    else:
+        print("Opción inválida: elegí 1, 2 o 3.")
+
+    if len(lineas) > 0:
+        ruta = torneo["config"]["archivos"]["reporte_filtrado"]
+        archivos.escribir_lineas(ruta, lineas)
+        mostrar_lineas(lineas)
+        print(f"Reporte guardado en {ruta}.")
+
+
+def reporte_general(torneo):
+    '''Opción 10: muestra el reporte general y las alertas y los escribe en sus archivos.'''
+    config = torneo["config"]
+    campeon = operaciones.obtener_campeon(torneo["partidos"], config["cuadro"])
+    lineas = reportes.lineas_reporte_general(config["nombre_torneo"], operaciones.reporte_general(torneo),
+                                             torneo["partidos"], torneo["equipos"], campeon, config["umbral_kda"])
+    archivos.escribir_lineas(config["archivos"]["reporte_general"], lineas)
+    alertas = actualizar_alertas(torneo)
+    mostrar_lineas(lineas)
+    mostrar_lineas(reportes.lineas_alertas(config["nombre_torneo"], alertas))
+    print(f"Reportes guardados en {config['archivos']['reporte_general']} y {config['archivos']['alertas']}.")
+
+
+def ejecutar_opcion(opcion, torneo):
+    '''Ejecuta una opción del menú si está habilitada; si no, muestra el motivo.'''
+    motivo = operaciones.motivo_no_disponible(opcion, torneo)
+    if motivo != "":
+        print(f"Opción no disponible: {motivo}.")
+    elif opcion == "0":
+        print("Saliendo del programa. ¡Hasta luego!")
+    elif opcion == "1":
+        registrar_equipo(torneo)
+    elif opcion == "2":
+        mostrar_lineas(reportes.lineas_equipos_y_jugadores(torneo["equipos"], torneo["jugadores"]))
+    elif opcion == "3":
+        generar_cuadro(torneo)
+    elif opcion == "4":
+        campeon = operaciones.obtener_campeon(torneo["partidos"], torneo["config"]["cuadro"])
+        mostrar_lineas(reportes.lineas_cuadro(torneo["partidos"], torneo["equipos"], campeon))
+    elif opcion == "5":
+        cargar_partido(torneo)
+    elif opcion == "6":
+        buscar(torneo)
+    elif opcion == "7" or opcion == "8":
+        mostrar_informe(opcion, torneo)
+    elif opcion == "9":
+        reporte_filtrado(torneo)
+    elif opcion == "10":
+        reporte_general(torneo)
+    else:
+        print("Opción inválida: elegí un número del 0 al 10.")
+
+
+def menu_principal(torneo):
+    '''Repite el menú hasta que se elija salir. Un error no impide seguir operando.'''
+    opcion = ""
+    while opcion != "0":
+        mostrar_menu(torneo)
+        opcion = input("Elegí una opción: ").strip()
+        try:
+            ejecutar_opcion(opcion, torneo)
+        except ValueError as error:
+            print(f"Error: {error}.")
+        except OSError as error:
+            print(f"Error de archivo: {error}. No se guardó ningún cambio.")
+
+
+# ============================================================
+# Login e inicio
+# ============================================================
+
+def login(usuarios):
+    '''Pide usuario y clave con 3 intentos. Retorna {"usuario", "rol"} o None.'''
+    print("===== INICIO DE SESIÓN =====")
+    usuario_actual = None
+    intentos = 0
+    autenticado = False
+    while intentos < 3 and not autenticado:
+        usuario = input("Usuario: ")
+        clave = input("Clave: ")
+        try:
+            usuario_actual = validaciones.autenticar_usuario(usuario, clave, usuarios)
+            autenticado = True
+        except ValueError as error:
+            intentos += 1
+            print(f"{error}. Intento {intentos} de 3.")
+    return usuario_actual
+
+
+def avisar_alertas(torneo):
+    '''Actualiza alertas.txt al iniciar e informa cuántas alertas hay. Si no se puede escribir, avisa y sigue.'''
+    try:
+        alertas = actualizar_alertas(torneo)
+        if len(alertas) > 0:
+            print(f"Se detectaron {len(alertas)} alertas. Detalle en {torneo['config']['archivos']['alertas']}.")
+    except OSError as error:
+        print(f"No se pudo escribir el archivo de alertas: {error}.")
+
 
 def main():
-    # ----- Configuracion (se obtiene con una funcion: no hay variables globales) -----
-    (n_equipos, n_jugadores, longitud_min, longitud_max, rondas_para_ganar,
-     umbral_kda, umbral_clutch, fases, nombres_estadisticas) = datos.crear_configuracion()
-
-    # ----- Estructuras de inscripcion -----
-    equipos = []               # lista de tuplas (codigo_equipo, nombre_equipo)
-    jugadores = []             # lista de tuplas (codigo_jugador, nickname, codigo_equipo)
-    matriz_stats = []          # fila = jugador, columnas = bajas / muertes / asistencias
-    partidos_por_jugador = []  # paralela a jugadores: partidos disputados por cada uno
-
-    # ----- Partidos: 7 listas paralelas homogeneas (el indice i es el MISMO partido) -----
-    partidos_id = []        # int: 1..7
-    partidos_fase = []      # str: una de fases
-    partidos_equipoA = []   # str: codigo_equipo, o "" si aun no se conoce
-    partidos_equipoB = []   # str: codigo_equipo, o "" si aun no se conoce
-    partidos_rondasA = []   # int: rondas ganadas por A, o -1 si no se cargo
-    partidos_rondasB = []   # int: rondas ganadas por B, o -1 si no se cargo
-    partidos_jugado = []    # bool: True si ya se cargo el resultado
-
-    # ----- Banderas de estado del torneo -----
-    inscripcion_cerrada = False
-    cuadro_generado = False
-    campeon = ""
-
-    seguir = True
-    while seguir == True:
-        mostrar_menu(len(equipos), n_equipos, inscripcion_cerrada, cuadro_generado,
-                     operaciones.hay_partidos_jugados(partidos_jugado))
-        opcion = pedir_entero("Elegi una opcion: ")
-
-        if opcion == 1:
-            se_puede, motivo = operaciones.se_puede_registrar_equipo(equipos, inscripcion_cerrada, n_equipos)
-            if se_puede == False:
-                print(motivo)
-            else:
-                print()
-                print(f"----- REGISTRO DEL EQUIPO E{len(equipos) + 1} -----")
-                nombre_equipo = pedir_nombre_equipo(equipos, longitud_min, longitud_max)
-                nicknames = pedir_nicknames_equipo(jugadores, n_jugadores, longitud_min, longitud_max)
-                ok, mensaje = operaciones.registrar_equipo(equipos, jugadores, matriz_stats,
-                                                           partidos_por_jugador, nombre_equipo,
-                                                           nicknames, n_jugadores)
-                print(mensaje)
-                print(f"Equipos registrados: {len(equipos)} de {n_equipos}.")
-
-        elif opcion == 2:
-            mostrar_equipos_y_jugadores(equipos, jugadores)
-
-        elif opcion == 3:
-            if operaciones.se_puede_generar_cuadro(equipos, cuadro_generado, n_equipos):
-                cuadro_generado = operaciones.generar_cuadro(
-                    equipos, partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
-                    partidos_rondasA, partidos_rondasB, partidos_jugado, n_equipos, fases)
-                inscripcion_cerrada = True
-                print("Cuadro de cuartos generado. La inscripcion quedo cerrada.")
-            elif cuadro_generado:
-                print("El cuadro ya fue generado. No se puede volver a sortear.")
-            else:
-                print(f"Faltan equipos: hay {len(equipos)} de {n_equipos} necesarios.")
-
-        elif opcion == 4:
-            if cuadro_generado:
-                mostrar_cuadro(partidos_id, partidos_fase, partidos_equipoA, partidos_equipoB,
-                               partidos_rondasA, partidos_rondasB, partidos_jugado, campeon)
-            else:
-                print("Todavia no se genero el cuadro. Usa la opcion 3 primero.")
-
-        elif opcion == 5:
-            if cuadro_generado == False:
-                print("Todavia no se genero el cuadro. Usa la opcion 3 primero.")
-            else:
-                id_partido = pedir_entero("Id del partido a cargar: ")
-                rondas_A = pedir_entero("Rondas ganadas por el equipo A: ")
-                rondas_B = pedir_entero("Rondas ganadas por el equipo B: ")
-
-                ok, mensaje, nuevo_campeon = operaciones.cargar_resultado(
-                    partidos_id, partidos_equipoA, partidos_equipoB,
-                    partidos_rondasA, partidos_rondasB, partidos_jugado,
-                    id_partido, rondas_A, rondas_B, rondas_para_ganar)
-                print(mensaje)
-
-                # Solo si el resultado se cargo bien se piden las estadisticas
-                # de los 10 jugadores (los 5 titulares de cada equipo).
-                if ok:
-                    indice = operaciones.buscar_indice_partido(partidos_id, id_partido)
-                    pedir_estadisticas_equipo(jugadores, matriz_stats, partidos_por_jugador,
-                                              partidos_equipoA[indice], nombres_estadisticas)
-                    pedir_estadisticas_equipo(jugadores, matriz_stats, partidos_por_jugador,
-                                              partidos_equipoB[indice], nombres_estadisticas)
-                    print()
-                    print("Estadisticas del partido cargadas correctamente.")
-
-                if nuevo_campeon != "":
-                    campeon = nuevo_campeon
-                    print(f"El torneo termino. Campeon: {campeon}")
-
-        elif opcion == 6:
-            print()
-            print("1. Buscar jugador (por codigo o nickname)")
-            print("2. Buscar equipo (por codigo)")
-            sub = pedir_entero("Que queres buscar: ")
-            if sub == 1:
-                texto = input("Codigo o nickname del jugador: ")
-                mostrar_jugador(jugadores, matriz_stats, partidos_por_jugador, texto,
-                                nombres_estadisticas, umbral_clutch)
-            elif sub == 2:
-                texto = input("Codigo del equipo: ")
-                mostrar_equipo(equipos, jugadores, partidos_id, partidos_fase,
-                               partidos_equipoA, partidos_equipoB, texto)
-            else:
-                print("Opcion invalida: elegi 1 o 2.")
-
-        elif opcion == 7:
-            if operaciones.hay_partidos_jugados(partidos_jugado) == False:
-                print("Todavia no hay partidos cargados: no hay rankings para mostrar.")
-            else:
-                ranking = operaciones.construir_ranking(jugadores, matriz_stats, partidos_por_jugador)
-                mostrar_ranking_completo(ranking, umbral_clutch)
-                mostrar_top3(ranking)
-
-        elif opcion == 8:
-            if operaciones.hay_partidos_jugados(partidos_jugado) == False:
-                print("Todavia no hay partidos cargados: no hay informes para mostrar.")
-            else:
-                ranking = operaciones.construir_ranking(jugadores, matriz_stats, partidos_por_jugador)
-                mostrar_mvp(ranking)
-                mostrar_equipo_mas_letal(equipos, jugadores, matriz_stats)
-                mostrar_resumen_general(equipos, matriz_stats, partidos_por_jugador,
-                                        partidos_equipoA, partidos_equipoB,
-                                        partidos_rondasA, partidos_rondasB, partidos_jugado,
-                                        umbral_kda)
-
-        elif opcion == 9:
-            print("Saliendo del programa. Hasta luego!")
-            seguir = False
-
+    ruta_configuracion = "configuracion.json"
+    try:
+        config = validaciones.validar_configuracion(archivos.leer_configuracion(ruta_configuracion))
+        usuarios, incidencias_usuarios = archivos.leer_usuarios(config["archivos"]["usuarios"])
+        usuario_actual = login(usuarios)
+        if usuario_actual is None:
+            print("Se agotaron los intentos. El programa finaliza.")
         else:
-            print("Opcion invalida: elegi un numero del 1 al 9.")
+            torneo = archivos.cargar_torneo(config)
+            torneo["usuario_actual"] = usuario_actual
+            torneo["incidencias"] = incidencias_usuarios + torneo["incidencias"]
+            avisar_alertas(torneo)
+            menu_principal(torneo)
+    except FileNotFoundError as error:
+        print(f"No se encontró {error.filename}. El programa finaliza.")
+    except ValueError as error:
+        print(f"Error: {error}. El programa finaliza.")
+    except OSError as error:
+        print(f"Error de archivo: {error}. El programa finaliza.")
 
 
 # Punto de entrada: se llama a main para arrancar el programa.
