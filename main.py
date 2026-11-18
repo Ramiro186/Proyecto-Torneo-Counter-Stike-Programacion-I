@@ -149,7 +149,7 @@ def registrar_equipo(torneo):
 
     equipo, jugadores_nuevos = operaciones.armar_equipo(nombre, nicknames, equipos, jugadores, config)
     archivos.registrar_equipo_en_archivos(config["archivos"]["equipos"], config["archivos"]["jugadores"],
-                                          equipo, jugadores_nuevos, jugadores)
+                                          equipo, jugadores_nuevos)
     equipos[equipo["codigo_equipo"]] = equipo
     for jugador in jugadores_nuevos:
         jugadores[jugador["codigo_jugador"]] = jugador
@@ -184,7 +184,7 @@ def cargar_partido(torneo):
 
     partidos_nuevos = operaciones.preparar_carga_partido(id_partido, fecha, rondas_a, rondas_b, filas, torneo)
     archivos.registrar_partido_en_archivos(config["archivos"]["estadisticas"], config["archivos"]["partidos"],
-                                           filas, partidos_nuevos, torneo["estadisticas"])
+                                           filas, partidos_nuevos)
     torneo["partidos"] = partidos_nuevos
     torneo["estadisticas"] = torneo["estadisticas"] + filas
 
@@ -346,7 +346,7 @@ def menu_principal(torneo):
         except ValueError as error:
             print(f"Error: {error}.")
         except OSError as error:
-            print(f"Error de archivo: {error}. No se guardó ningún cambio.")
+            print(f"Error de archivo: {error}.")
 
 
 # ============================================================

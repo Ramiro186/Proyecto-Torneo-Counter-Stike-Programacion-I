@@ -262,16 +262,30 @@ def convertir_cuadro(cuadro):
     return convertido
 
 
-def validar_entero_positivo_config(valor, clave):
-    '''Lanza ValueError si el valor de esa clave no es un entero positivo.'''
-    if type(valor) != int or valor <= 0:
-        raise ValueError(f"La clave '{clave}' debe ser un entero positivo")
+def validar_entero_config(valor, clave, minimo, maximo):
+    '''Lanza ValueError si el valor de esa clave no es un entero entre minimo y maximo.'''
+    if type(valor) != int or valor < minimo or valor > maximo:
+        raise ValueError(f"La clave '{clave}' debe ser un entero entre {minimo} y {maximo}")
 
 
-def validar_numero_config(valor, clave):
-    '''Lanza ValueError si el valor de esa clave no es un número no negativo.'''
-    if (type(valor) != int and type(valor) != float) or valor < 0:
-        raise ValueError(f"La clave '{clave}' debe ser un número no negativo")
+def validar_numero_config(valor, clave, minimo, maximo):
+    '''Lanza ValueError si el valor de esa clave no es un número entre minimo y maximo.'''
+    # json.loads acepta NaN e Infinity. Toda comparación con NaN da False,
+    # así que "not (minimo <= valor y valor <= maximo)" también los rechaza.
+    if (type(valor) != int and type(valor) != float) or not (valor >= minimo and valor <= maximo):
+        raise ValueError(f"La clave '{clave}' debe ser un número entre {minimo} y {maximo}")
+
+
+def validar_fases(fases):
+    '''Retorna las fases como tupla si son 3 textos distintos y sin ";", o lanza ValueError.'''
+    if type(fases) != list or len(fases) != 3:
+        raise ValueError("La clave 'fases' debe ser una lista de 3 fases")
+    for fase in fases:
+        if type(fase) != str or fase.strip() == "" or ";" in fase:
+            raise ValueError("Cada fase debe ser un texto no vacío y sin ';'")
+    if len(set(fases)) != 3:
+        raise ValueError("Las 3 fases deben ser distintas")
+    return tuple(fases)
 
 
 def validar_archivos_config(archivos):
@@ -304,26 +318,24 @@ def validar_configuracion(crudo):
     except TypeError:
         raise ValueError("La configuración debe ser un objeto JSON con las claves y tipos esperados")
 
-    if type(nombre_torneo) != str:
-        raise ValueError("La clave 'nombre_torneo' debe ser un texto")
-    validar_entero_positivo_config(cantidad_equipos, "cantidad_equipos")
-    validar_entero_positivo_config(jugadores_por_equipo, "jugadores_por_equipo")
-    validar_entero_positivo_config(rondas_para_ganar, "rondas_para_ganar")
-    validar_numero_config(umbral_kda, "umbral_kda")
-    validar_numero_config(umbral_clutch, "umbral_clutch")
-    validar_numero_config(umbral_kda_bajo, "umbral_kda_bajo")
-    if cantidad_equipos != 8:
+    if type(nombre_torneo) != str or nombre_torneo.strip() == "":
+        raise ValueError("La clave 'nombre_torneo' debe ser un texto no vacío")
+    if type(cantidad_equipos) != int or cantidad_equipos != 8:
         raise ValueError("La clave 'cantidad_equipos' debe ser 8: el cuadro tiene 7 partidos")
-    if cantidad_equipos * jugadores_por_equipo > 99:
-        raise ValueError("La clave 'jugadores_por_equipo' es demasiado grande para los códigos J01 a J99")
-    if type(fases) != list or len(fases) != 3:
-        raise ValueError("La clave 'fases' debe ser una lista de 3 fases")
+    if type(jugadores_por_equipo) != int or jugadores_por_equipo != 5:
+        raise ValueError("La clave 'jugadores_por_equipo' debe ser 5: cada equipo juega con 5 titulares")
+    validar_entero_config(rondas_para_ganar, "rondas_para_ganar", 9, 16)
+    validar_numero_config(umbral_kda_bajo, "umbral_kda_bajo", 0, 100)
+    validar_numero_config(umbral_kda, "umbral_kda", 0, 100)
+    validar_numero_config(umbral_clutch, "umbral_clutch", 0, 100)
+    if not (umbral_kda_bajo < umbral_kda and umbral_kda <= umbral_clutch):
+        raise ValueError("Los umbrales deben cumplir umbral_kda_bajo < umbral_kda <= umbral_clutch")
 
     return {
         "nombre_torneo": nombre_torneo,
         "cantidad_equipos": cantidad_equipos,
         "jugadores_por_equipo": jugadores_por_equipo,
-        "fases": tuple(fases),
+        "fases": validar_fases(fases),
         "cuadro": convertir_cuadro(cuadro),
         "rondas_para_ganar": rondas_para_ganar,
         "umbral_kda": umbral_kda,

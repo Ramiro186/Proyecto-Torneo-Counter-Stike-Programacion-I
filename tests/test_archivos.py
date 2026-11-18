@@ -1,8 +1,8 @@
-# Pruebas 18 a 23: archivos y consistencia.
+# Pruebas 18 a 23 y 27 a 28: archivos y consistencia.
 # Cada prueba prepara sus archivos en tests/archivos_prueba/ con modo wt.
 
-from archivos import (guardar_estadisticas, leer_estadisticas, registrar_equipo_en_archivos,
-                      verificar_combinacion_archivos)
+from archivos import (archivo_existe, guardar_estadisticas, leer_estadisticas, preparar_archivos,
+                      registrar_equipo_en_archivos, registrar_partido_en_archivos, verificar_combinacion_archivos)
 
 
 def escribir_estadisticas(ruta, lineas):
@@ -62,7 +62,7 @@ def test_alta_equipo_con_falla_no_deja_el_equipo():
     hubo_error = False
     try:
         registrar_equipo_en_archivos(ruta_equipos, "tests/archivos_prueba/carpeta_inexistente/jugadores.csv",
-                                     equipo, jugadores_nuevos, {})
+                                     equipo, jugadores_nuevos)
     except OSError:
         hubo_error = True
 
@@ -70,3 +70,44 @@ def test_alta_equipo_con_falla_no_deja_el_equipo():
         contenido = arch.read()
     assert hubo_error, "Si no se puede escribir jugadores.csv debería lanzarse OSError"
     assert contenido == "codigo_equipo;nombre_equipo\n", "equipos.csv debería seguir solo con el encabezado"
+
+
+def test_falla_al_guardar_partido_restaura_estadisticas():
+    ruta_estadisticas = "tests/archivos_prueba/estadisticas_partido.csv"
+    escribir_estadisticas(ruta_estadisticas, ["1;J01;24;15;6"])
+    with open(ruta_estadisticas, "rt", encoding="utf-8") as arch:
+        antes = arch.read()
+    filas = [{"id_partido": 2, "codigo_jugador": "J06", "bajas": 10, "muertes": 8, "asistencias": 3}]
+
+    hubo_error = False
+    try:
+        registrar_partido_en_archivos(ruta_estadisticas, "tests/archivos_prueba/carpeta_inexistente/partidos.csv",
+                                      filas, {})
+    except OSError:
+        hubo_error = True
+
+    with open(ruta_estadisticas, "rt", encoding="utf-8") as arch:
+        despues = arch.read()
+    assert hubo_error, "Si no se puede escribir partidos.csv debería lanzarse OSError"
+    assert despues == antes, "estadisticas.csv debería volver a su contenido anterior, sin las filas nuevas"
+
+
+def test_falla_al_crear_archivos_no_deja_combinacion_inconsistente():
+    rutas = {"equipos": "tests/archivos_prueba/nuevo_equipos.csv",
+             "jugadores": "tests/archivos_prueba/carpeta_inexistente/jugadores.csv",
+             "partidos": "tests/archivos_prueba/nuevo_partidos.csv",
+             "estadisticas": "tests/archivos_prueba/nuevo_estadisticas.csv"}
+    for nombre in ("equipos", "partidos", "estadisticas"):
+        with open(rutas[nombre], "wt", encoding="utf-8") as arch:
+            arch.write("")
+
+    hubo_error = False
+    try:
+        preparar_archivos({"archivos": rutas})
+    except OSError:
+        hubo_error = True
+
+    situacion = verificar_combinacion_archivos(archivo_existe(rutas["equipos"]), archivo_existe(rutas["jugadores"]),
+                                               archivo_existe(rutas["partidos"]), archivo_existe(rutas["estadisticas"]), False)
+    assert hubo_error, "Si no se puede crear jugadores.csv debería lanzarse OSError"
+    assert situacion == "torneo_nuevo", "equipos.csv debería quedar vacío, para que el próximo inicio vuelva a crear todo"

@@ -208,68 +208,109 @@ def linea_estadistica(fila):
             + str(fila["muertes"]) + ";" + str(fila["asistencias"]) + "\n")
 
 
-def escribir_csv(ruta, encabezado, lineas):
-    '''Escribe un CSV desde cero con su encabezado y sus líneas.'''
-    with open(ruta, "wt", encoding="utf-8") as arch:
-        arch.write(encabezado + "\n" + "".join(lineas))
+def texto_csv(encabezado, lineas):
+    '''Retorna el contenido completo de un CSV: el encabezado y sus líneas.'''
+    return encabezado + "\n" + "".join(lineas)
 
 
-def agregar_lineas(ruta, lineas):
-    '''Agrega líneas al final de un archivo en una sola escritura.'''
-    with open(ruta, "at", encoding="utf-8") as arch:
-        arch.write("".join(lineas))
+# ============================================================
+# 4) Escritura con respaldo
+# ============================================================
+# Toda escritura pasa por escribir_con_respaldo: antes de tocar un archivo se guarda
+# su contenido y, si cualquier escritura falla, cada archivo tocado vuelve a como estaba.
+
+def leer_texto(ruta):
+    '''Retorna el contenido completo de un archivo, o None si no existe.'''
+    try:
+        with open(ruta, "rt", encoding="utf-8") as arch:
+            texto = arch.read()
+    except FileNotFoundError:
+        texto = None
+    return texto
 
 
-def guardar_jugadores(ruta, jugadores):
-    '''Reescribe jugadores.csv desde el diccionario de jugadores.'''
-    escribir_csv(ruta, encabezados()["jugadores"], [linea_jugador(jugadores[codigo]) for codigo in jugadores])
+def escribir_texto(ruta, modo, texto):
+    '''Escribe el texto en el archivo con el modo indicado (wt o at), en una sola escritura.'''
+    with open(ruta, modo, encoding="utf-8") as arch:
+        arch.write(texto)
+
+
+def restaurar_archivo(ruta, texto_anterior):
+    '''Deja el archivo con su contenido anterior, o vacío si no existía. Retorna False si no se pudo.'''
+    restaurado = True
+    try:
+        if leer_texto(ruta) != texto_anterior:
+            if texto_anterior is None:
+                escribir_texto(ruta, "wt", "")
+            else:
+                escribir_texto(ruta, "wt", texto_anterior)
+    except OSError:
+        restaurado = False
+    return restaurado
+
+
+def escribir_con_respaldo(cambios):
+    '''Aplica en orden cada cambio (ruta, modo, texto). Si uno falla, restaura los archivos tocados y lanza OSError.'''
+    try:
+        respaldos = [leer_texto(cambio[0]) for cambio in cambios]
+    except OSError as error:
+        raise OSError(f"No se pudo leer {error.filename} antes de escribir. No se guardó ningún cambio")
+
+    escritos = 0
+    falla = None
+    while escritos < len(cambios) and falla is None:
+        try:
+            escribir_texto(cambios[escritos][0], cambios[escritos][1], cambios[escritos][2])
+            escritos += 1
+        except OSError as error:
+            falla = error
+
+    if falla is not None:
+        sin_restaurar = []
+        for i in range(escritos + 1):
+            if not restaurar_archivo(cambios[i][0], respaldos[i]):
+                sin_restaurar.append(cambios[i][0])
+        motivo = falla.strerror
+        if motivo is None:
+            motivo = str(falla)
+        if len(sin_restaurar) > 0:
+            raise OSError(f"No se pudo escribir {cambios[escritos][0]} ({motivo}) ni restaurar {', '.join(sin_restaurar)}. "
+                          "Revisá esos archivos antes de volver a iniciar")
+        raise OSError(f"No se pudo escribir {cambios[escritos][0]} ({motivo}). Se restauraron los archivos y no se guardó ningún cambio")
 
 
 def guardar_partidos(ruta, partidos):
     '''Reescribe partidos.csv desde el diccionario de partidos.'''
-    escribir_csv(ruta, encabezados()["partidos"], [linea_partido(partidos[clave]) for clave in partidos])
+    texto = texto_csv(encabezados()["partidos"], [linea_partido(partidos[clave]) for clave in partidos])
+    escribir_con_respaldo([(ruta, "wt", texto)])
 
 
 def guardar_estadisticas(ruta, estadisticas):
     '''Reescribe estadisticas.csv desde la lista de registros.'''
-    escribir_csv(ruta, encabezados()["estadisticas"], [linea_estadistica(fila) for fila in estadisticas])
+    texto = texto_csv(encabezados()["estadisticas"], [linea_estadistica(fila) for fila in estadisticas])
+    escribir_con_respaldo([(ruta, "wt", texto)])
 
 
-def registrar_equipo_en_archivos(ruta_equipos, ruta_jugadores, equipo, jugadores_nuevos, jugadores_actuales):
-    '''Agrega los jugadores y después el equipo. Si algo falla, deshace y lanza OSError.'''
-    try:
-        agregar_lineas(ruta_jugadores, [linea_jugador(jugador) for jugador in jugadores_nuevos])
-        agregar_lineas(ruta_equipos, [linea_equipo(equipo)])
-    except OSError:
-        try:
-            guardar_jugadores(ruta_jugadores, jugadores_actuales)
-        except OSError:
-            raise OSError(f"No se pudo registrar el equipo ni restaurar {ruta_jugadores}")
-        raise
+def registrar_equipo_en_archivos(ruta_equipos, ruta_jugadores, equipo, jugadores_nuevos):
+    '''Agrega los jugadores y después el equipo. Si algo falla, los dos archivos quedan como estaban.'''
+    lineas_jugadores = "".join([linea_jugador(jugador) for jugador in jugadores_nuevos])
+    escribir_con_respaldo([(ruta_jugadores, "at", lineas_jugadores), (ruta_equipos, "at", linea_equipo(equipo))])
 
 
-def registrar_partido_en_archivos(ruta_estadisticas, ruta_partidos, filas_nuevas, partidos_nuevos, estadisticas_actuales):
-    '''Agrega las estadísticas y reescribe los partidos. Si algo falla, deshace y lanza OSError.'''
-    agregar_lineas(ruta_estadisticas, [linea_estadistica(fila) for fila in filas_nuevas])
-    try:
-        guardar_partidos(ruta_partidos, partidos_nuevos)
-    except OSError:
-        try:
-            guardar_estadisticas(ruta_estadisticas, estadisticas_actuales)
-        except OSError:
-            raise OSError(f"No se pudo guardar el partido ni restaurar {ruta_estadisticas}")
-        raise
+def registrar_partido_en_archivos(ruta_estadisticas, ruta_partidos, filas_nuevas, partidos_nuevos):
+    '''Agrega las estadísticas y reescribe los partidos. Si algo falla, los dos archivos quedan como estaban.'''
+    lineas_estadisticas = "".join([linea_estadistica(fila) for fila in filas_nuevas])
+    texto_partidos = texto_csv(encabezados()["partidos"], [linea_partido(partidos_nuevos[clave]) for clave in partidos_nuevos])
+    escribir_con_respaldo([(ruta_estadisticas, "at", lineas_estadisticas), (ruta_partidos, "wt", texto_partidos)])
 
 
 def escribir_lineas(ruta, lineas):
     '''Escribe un reporte de texto desde cero, una línea por elemento.'''
-    with open(ruta, "wt", encoding="utf-8") as arch:
-        for linea in lineas:
-            arch.write(linea + "\n")
+    escribir_con_respaldo([(ruta, "wt", "".join([linea + "\n" for linea in lineas]))])
 
 
 # ============================================================
-# 4) Consistencia entre archivos
+# 5) Consistencia entre archivos
 # ============================================================
 
 def verificar_combinacion_archivos(existe_equipos, existe_jugadores, existe_partidos, existe_estadisticas, hay_jugados):
@@ -287,13 +328,9 @@ def verificar_combinacion_archivos(existe_equipos, existe_jugadores, existe_part
 
 
 def archivo_existe(ruta):
-    '''Indica si el archivo se puede abrir para leer.'''
-    try:
-        with open(ruta, "rt", encoding="utf-8"):
-            existe = True
-    except FileNotFoundError:
-        existe = False
-    return existe
+    '''Indica si el archivo existe y no está vacío. Vacío es como queda un archivo cuya creación falló.'''
+    texto = leer_texto(ruta)
+    return texto is not None and texto != ""
 
 
 def preparar_archivos(config):
@@ -311,11 +348,9 @@ def preparar_archivos(config):
                                                existe["estadisticas"], hay_jugados)
     if situacion == "inconsistente":
         faltantes = [rutas[nombre] for nombre in existe if not existe[nombre]]
-        raise ValueError(f"Los archivos son inconsistentes y no se puede reconstruir el torneo. Falta: {', '.join(faltantes)}")
+        raise ValueError(f"Los archivos son inconsistentes y no se puede reconstruir el torneo. Falta o está vacío: {', '.join(faltantes)}")
 
-    for nombre in existe:
-        if not existe[nombre]:
-            escribir_csv(rutas[nombre], titulos[nombre], [])
+    escribir_con_respaldo([(rutas[nombre], "wt", titulos[nombre] + "\n") for nombre in existe if not existe[nombre]])
 
 
 def verificar_equipos_y_jugadores(equipos, jugadores, config):

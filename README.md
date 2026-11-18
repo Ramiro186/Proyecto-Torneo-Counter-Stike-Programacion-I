@@ -30,7 +30,7 @@ La etapa 2 convierte el gestor de torneo de la etapa 1 en un sistema persistente
 | Modularización y responsabilidades | CUMPLE PARCIAL | `input()` y `print()` solo están en `main.py`. `operaciones.py`, `validaciones.py`, `reportes.py` y `archivos.py` reciben datos por parámetro y devuelven resultados o lanzan excepciones (punto 15). |
 | Estado visible en el menú | CUMPLE PARCIAL | El encabezado y las opciones del menú cambian según el estado: inscripción abierta (con equipos registrados / 8), inscripción cerrada o torneo finalizado con su campeón (punto 13). |
 | Nombre / nickname válido | CUMPLE PARCIAL | El nombre se normaliza con `strip()` y `lower()` antes de comparar y se guarda normalizado en memoria y en el CSV (punto 8). |
-| Casos de prueba formales | NO CUMPLE | Se definen 23 pruebas unitarias, clasificadas en casos válidos, inválidos y límite (punto 14). |
+| Casos de prueba formales | NO CUMPLE | Se definen 28 pruebas unitarias, clasificadas en casos válidos, inválidos y límite (punto 14). |
  
 ### 2.2 Devolución del alcance de la etapa 2
  
@@ -44,6 +44,13 @@ La etapa 2 convierte el gestor de torneo de la etapa 1 en un sistema persistente
 | 6. Claves de `config["cuadro"]` | Punto 5: las claves se convierten a entero al cargar la configuración. |
 | 7. Consistencia entre `equipos.csv` y `jugadores.csv` | Punto 6.5: los jugadores se escriben primero y el equipo después; si falla cualquiera de las dos escrituras, se deshace y no queda nada del equipo. |
 | 8. Pruebas de archivos | Punto 14: seis pruebas de archivos y consistencia (`tests/test_archivos.py`). |
+
+### 2.3 Devolución de la entrega de la etapa 2
+
+| Aspecto a mejorar | Problema encontrado | Cómo se resuelve |
+|---|---|---|
+| Recuperación ante errores de escritura | El modo `wt` vacía el archivo antes de escribir: si la escritura fallaba a mitad de camino, el archivo quedaba cortado y no había copia del contenido anterior. Además, algunas escrituras no tenían deshacer: las filas agregadas a `estadisticas.csv`, la línea de `equipos.csv`, la generación del cuadro y la creación de los CSV de un torneo nuevo. En todos esos casos el torneo no se podía volver a abrir | Punto 6.5: toda escritura pasa por `escribir_con_respaldo`, que guarda el contenido de cada archivo antes de tocarlo y, si cualquier escritura falla, deja todos los archivos como estaban. Punto 6.3: un archivo vacío se trata como inexistente. Pruebas 23, 27 y 28 |
+| Validación de los parámetros numéricos del JSON | Solo se controlaba que fueran enteros positivos o números no negativos. Se aceptaban `NaN` e `Infinity` (que `json.loads` acepta), umbrales contradictorios (`umbral_kda_bajo` mayor que `umbral_clutch`), `rondas_para_ganar` de 1, equipos de 1 jugador y fases repetidas o que no eran texto | Punto 5: cada parámetro tiene un rango, los umbrales deben estar ordenados y las fases deben ser 3 textos distintos. Pruebas 24, 25 y 26 |
  
 ## 3. Cambios de estructuras respecto de la etapa 1
  
@@ -114,7 +121,19 @@ Los parámetros que en la etapa 1 estaban en `datos.py` se leen de `configuracio
 - **`rondas_para_ganar`** es el 13 de la regla del marcador (punto 13 de la etapa 1).
 - **`fases`** llega como lista y se convierte a tupla con `tuple()`.
 - **`umbral_kda_bajo`** es nuevo y alimenta la alerta de bajo rendimiento (punto 10).
-- **Validación al cargar:** deben estar todas las claves, con el tipo correcto (enteros, números, lista de 3 fases, cuadro con las claves 5, 6 y 7).
+- **Validación al cargar:** deben estar todas las claves, con el tipo correcto y dentro de su rango:
+
+| Clave | Regla | Motivo |
+|---|---|---|
+| `nombre_torneo` | Texto no vacío | Encabeza cada reporte |
+| `cantidad_equipos` | Entero, exactamente 8 | El cuadro tiene 7 partidos |
+| `jugadores_por_equipo` | Entero, exactamente 5 | Cada equipo de Counter Strike juega con 5 titulares |
+| `rondas_para_ganar` | Entero entre 9 y 16 | Cubre los formatos competitivos: MR8 (9), MR12 (13) y MR15 (16) |
+| `umbral_kda_bajo`, `umbral_kda`, `umbral_clutch` | Número entre 0 y 100, y además `umbral_kda_bajo < umbral_kda <= umbral_clutch` | Si no están ordenados, un mismo jugador podría ser clutch y de bajo rendimiento a la vez |
+| `fases` | Lista de 3 textos distintos, no vacíos y sin `;` | Se escriben en `partidos.csv`, donde `;` es el separador |
+| `cuadro` | Claves 5, 6 y 7; cada valor, un par de partidos anteriores; cada partido del 1 al 6 usado una sola vez | Expresa la progresión del cuadro |
+
+- **`NaN` e `Infinity`:** `json.loads` los acepta aunque no son JSON estándar. Se rechazan sin usar módulos extra, porque cualquier comparación con `NaN` da `False`: la condición `valor >= minimo and valor <= maximo` no se cumple y se lanza `ValueError`. `Infinity` supera el máximo de 100. `True` y `False` tampoco se aceptan como números, porque el tipo se controla con `type(valor) == int`.
 - **Si falta o es inválido**, el programa informa qué clave o qué error encontró y termina. Nunca se reemplaza en silencio por valores por defecto.
 - La única ruta escrita en el código es la de `configuracion.json`, como variable local de `main()`.
  
@@ -172,6 +191,8 @@ Se mantiene la convención de la etapa 1 para lo que todavía no se conoce: equi
 ### 6.3 Consistencia entre archivos al iniciar
  
 Antes de cargar el torneo se comprueba qué archivos existen (abriéndolos con `try/except FileNotFoundError`). Un CSV faltante solo se crea automáticamente cuando su ausencia es coherente con un estado posible del torneo: por ejemplo, si existen `partidos.csv` y `estadisticas.csv` pero falta `equipos.csv`, el torneo no se puede reconstruir y el programa no continúa.
+
+Un archivo vacío (0 caracteres) se trata como inexistente. Es el estado en que queda un archivo cuya creación falló (punto 6.5), y así el próximo inicio lo vuelve a crear en lugar de declarar el torneo inconsistente.
  
 | `equipos.csv` | `jugadores.csv` | `partidos.csv` | `estadisticas.csv` | Situación | Acción |
 |---|---|---|---|---|---|
@@ -202,14 +223,31 @@ Un problema puntual en una fila no impide continuar: se descarta la fila, se reg
  
 ### 6.5 Escritura consistente
  
-Cada operación que modifica dos archivos se escribe en un orden fijo, y si la segunda escritura falla se deshace la primera. El estado en memoria se actualiza recién cuando las dos escrituras terminaron bien.
+Ninguna escritura puede dejar un archivo a medio escribir. Todas pasan por la función `escribir_con_respaldo(cambios)`, que recibe una lista de tuplas `(ruta, modo, texto)`:
+
+1. **Respaldo:** antes de escribir, lee el contenido completo de cada archivo que va a tocar (o `None` si todavía no existe).
+2. **Escritura:** aplica los cambios en orden, cada uno en una sola escritura. El ciclo es `while escritos < len(cambios) and falla is None`, sin `break`.
+3. **Restauración:** si alguna escritura lanza `OSError`, vuelve a escribir con modo `wt` el contenido respaldado de cada archivo que llegó a tocar, incluido el que falló. Un archivo que no existía queda vacío, y el punto 6.3 lo trata como inexistente. Un archivo cuyo contenido no cambió (por ejemplo, porque `open` falló antes de escribir) no se toca.
+4. **Aviso:** lanza `OSError` con un mensaje que dice qué archivo no se pudo escribir y que no se guardó ningún cambio. Si además la restauración falla, el mensaje nombra los archivos que hay que revisar.
+
+Esto resuelve los casos que antes dejaban el torneo sin poder abrirse: el modo `wt` vacía el archivo al abrirlo, y si la escritura fallaba en ese momento, no quedaba copia del contenido anterior. Se usa solo `open()`, sin módulos externos. El estado en memoria se actualiza recién cuando todas las escrituras terminaron bien.
+
+Las operaciones y sus cambios, en el orden en que se escriben:
+
+| Operación | Cambios |
+|---|---|
+| Alta de un equipo | 1) 5 jugadores a `jugadores.csv` (`at`); 2) el equipo a `equipos.csv` (`at`) |
+| Generar el cuadro | `partidos.csv` completo (`wt`) |
+| Carga de un partido | 1) 10 filas a `estadisticas.csv` (`at`); 2) `partidos.csv` completo (`wt`) |
+| Torneo nuevo o reanudación | Cada CSV faltante con su encabezado (`wt`) |
+| Reportes | El `.txt` completo (`wt`) |
  
 **Alta de un equipo:**
  
 1. Se validan en memoria el nombre del equipo y sus 5 jugadores. Si algo falla, no se escribe nada.
 2. Se agregan los 5 jugadores a `jugadores.csv` (modo `at`, una sola escritura con las 5 líneas).
 3. Se agrega el equipo a `equipos.csv` (modo `at`).
-4. Si falla el paso 2 o el 3 (`OSError`), se reescribe `jugadores.csv` completo desde la memoria (modo `wt`), que todavía no tiene a esos 5 jugadores. Así no quedan ni el equipo ni sus jugadores.
+4. Si falla el paso 2 o el 3 (`OSError`), `escribir_con_respaldo` deja `jugadores.csv` y `equipos.csv` con su contenido anterior. Así no quedan ni el equipo ni sus jugadores, ni una línea cortada.
  
 Como el equipo se escribe al final, nunca queda un equipo en `equipos.csv` sin sus jugadores. Y si se modificaran los archivos a mano, el control de coherencia del punto 6.3 lo detecta al iniciar.
  
@@ -218,7 +256,7 @@ Como el equipo se escribe al final, nunca queda un equipo en `equipos.csv` sin s
 1. Se validan en memoria el marcador, la fecha y las 10 filas de estadísticas.
 2. Se agregan las 10 filas a `estadisticas.csv` (modo `at`).
 3. Se reescribe `partidos.csv` completo (modo `wt`) con el partido marcado como jugado y el ganador ubicado en el partido siguiente.
-4. Si falla el paso 3, se reescribe `estadisticas.csv` desde la memoria, sin las 10 filas nuevas.
+4. Si falla el paso 2 o el 3, `escribir_con_respaldo` deja `estadisticas.csv` y `partidos.csv` con su contenido anterior: sin las 10 filas nuevas y con el cuadro como estaba.
  
 ### 6.6 Reglas generales de persistencia
  
@@ -310,7 +348,7 @@ Las validaciones lanzan `ValueError`; el acceso a archivos captura los errores d
 | Combinación de archivos o contenido inconsistente | `ValueError` | `main()` | Mensaje con el problema encontrado; fin del programa |
 | Encabezado de CSV distinto del esperado | `ValueError` | `archivos.py` → `main()` | Mensaje y fin: no se adivina el orden de columnas |
 | Fila con formato inválido o duplicada | `ValueError` | `archivos.py` (por fila) | Se descarta la fila, se registra la incidencia y se sigue con las demás |
-| No se puede abrir o escribir un archivo (sin permisos, ruta inexistente) | `OSError` | `archivos.py` → `main()` | Se deshace la escritura anterior (punto 6.5) y se informa; el dato no se agrega al estado en memoria |
+| No se puede abrir o escribir un archivo (sin permisos, ruta inexistente) | `OSError` | `archivos.py` → `main()` | Los archivos tocados vuelven a su contenido anterior (punto 6.5) y se informa; el dato no se agrega al estado en memoria |
 | Dato ingresado inválido (regex, marcador, duplicado, reglas del punto 10) | `ValueError` lanzado con `raise` | `main.py` | Mensaje con el formato esperado; se vuelve a pedir o se vuelve al menú |
 | Número no numérico | `ValueError` de `int()` | `main.py` | Igual que el caso anterior |
 | Búsqueda sin resultado | — (la función devuelve `None`) | `main.py` | "No se encontró el jugador / equipo" |
@@ -444,7 +482,7 @@ El menú de la etapa 1 (punto 24) se conserva y suma dos opciones de reportes; c
  
 ## 14. Pruebas unitarias
  
-Se definen 23 pruebas unitarias automatizadas con pytest, que cubren los 7 casos mínimos del punto 10 de los lineamientos y las observaciones de la devolución. Además, responden a la observación de la etapa 1 sobre casos de prueba formales: cada prueba indica si es un caso válido, inválido o límite. Siguen lo visto en la clase 12:
+Se definen 28 pruebas unitarias automatizadas con pytest, que cubren los 7 casos mínimos del punto 10 de los lineamientos y las observaciones de las devoluciones. Las pruebas 24 a 28 se agregaron por la devolución de la entrega de la etapa 2 (punto 2.3). Además, responden a la observación de la etapa 1 sobre casos de prueba formales: cada prueba indica si es un caso válido, inválido o límite. Siguen lo visto en la clase 12:
  
 - **Dos tipos de archivo:** el código que se prueba (`validaciones.py`, `operaciones.py`, `archivos.py`) y los archivos de pruebas, que importan las funciones con `from validaciones import validar_nombre`.
 - **Nombres:** pytest reconoce archivos con prefijo `test_` y funciones con prefijo `test_`. Hay tres archivos: `tests/test_validaciones.py`, `tests/test_operaciones.py` y `tests/test_archivos.py`.
@@ -462,6 +500,9 @@ Se definen 23 pruebas unitarias automatizadas con pytest, que cubren los 7 casos
 | 4 | Inválido | Validación incorrecta con excepción | `test_empate_lanza_error` | `validar_marcador` | `13, 13` | Se lanza `ValueError` |
 | 5 | Límite | Valor exactamente igual al límite | `test_marcador_13_a_12_es_valido` | `validar_marcador` | `13, 12, 13` | Se acepta, sin excepción |
 | 6 | Válido | Devolución etapa 2, punto 6 | `test_cuadro_con_claves_enteras` | `convertir_cuadro` | `{"5": [1, 2], "6": [3, 4], "7": [5, 6]}` | `{5: (1, 2), 6: (3, 4), 7: (5, 6)}` |
+| 24 | Inválido | Devolución entrega etapa 2: parámetros numéricos | `test_configuracion_rechaza_nan_e_infinito` | `validar_configuracion` | `umbral_kda` en `NaN`; `umbral_clutch` en `Infinity` | Se lanza `ValueError` en los dos casos |
+| 25 | Inválido | Devolución entrega etapa 2: parámetros numéricos | `test_umbrales_desordenados_lanzan_error` | `validar_configuracion` | `umbral_kda_bajo` en 10.0, mayor que `umbral_clutch` | Se lanza `ValueError` |
+| 26 | Límite | Valor exactamente igual al límite | `test_rondas_para_ganar_limite` | `validar_configuracion` | `rondas_para_ganar` en 16 y en 17 | 16 se acepta; 17 lanza `ValueError` |
  
 ### 14.2 Cálculos y reglas del negocio (tests/test_operaciones.py)
  
@@ -491,6 +532,8 @@ Estas pruebas usan la carpeta `tests/archivos_prueba/`, que forma parte del repo
 | 21 | Inválido | Devolución etapa 2, punto 3 | `test_combinacion_duplicada_se_descarta` | `leer_estadisticas` | Archivo con dos filas `1;J01;...` | 1 registro y 1 incidencia |
 | 22 | Inválido / válido | Devolución etapa 2, punto 2 | `test_combinaciones_de_archivos` | `verificar_combinacion_archivos` | Faltan equipos y existen partidos y estadísticas; y no existe ningún archivo | `"inconsistente"`; `"torneo_nuevo"` |
 | 23 | Inválido | Devolución etapa 2, punto 7 | `test_alta_equipo_con_falla_no_deja_el_equipo` | `registrar_equipo_en_archivos` | `equipos.csv` de prueba solo con encabezado y ruta de jugadores en una carpeta inexistente | Se lanza `OSError` y `equipos.csv` sigue solo con el encabezado |
+| 27 | Inválido | Devolución entrega etapa 2: errores de escritura | `test_falla_al_guardar_partido_restaura_estadisticas` | `registrar_partido_en_archivos` | `estadisticas.csv` de prueba con una fila y ruta de partidos en una carpeta inexistente | Se lanza `OSError` y `estadisticas.csv` vuelve a su contenido anterior, sin la fila nueva |
+| 28 | Inválido | Devolución entrega etapa 2: errores de escritura | `test_falla_al_crear_archivos_no_deja_combinacion_inconsistente` | `preparar_archivos` | Torneo nuevo con la ruta de jugadores en una carpeta inexistente | Se lanza `OSError` y la combinación de archivos sigue siendo `"torneo_nuevo"` |
  
 Ejemplo de un cálculo simple (`tests/test_operaciones.py`):
  
@@ -501,7 +544,7 @@ def test_calcular_kda():
     assert calcular_kda(20, 10, 5) == 2.5, "Con 20 bajas, 10 muertes y 5 asistencias el KDA debería ser 2.5"
 ```
  
-Pruebas que esperan una excepción (casos 2, 3, 4, 18 y 23). Se combinan `try/except` (clase 5) con `assert` (clase 12): si la función lanza la excepción esperada, la bandera queda en `True` y la prueba pasa; si no la lanza, el `assert` falla.
+Pruebas que esperan una excepción (casos 2, 3, 4, 18, 23, 24, 25, 26, 27 y 28). Se combinan `try/except` (clase 5) con `assert` (clase 12): si la función lanza la excepción esperada, la bandera queda en `True` y la prueba pasa; si no la lanza, el `assert` falla.
  
 ```python
 from validaciones import validar_nombre
@@ -539,12 +582,12 @@ python -m pytest -v
 tests/test_archivos.py::test_leer_archivo_inexistente_lanza_error PASSED
 tests/test_archivos.py::test_guardar_y_leer_estadisticas PASSED
 ...
-tests/test_validaciones.py::test_cuadro_con_claves_enteras PASSED
+tests/test_validaciones.py::test_rondas_para_ganar_limite PASSED
 # Resultado esperado de referencia:
-# 23 passed
+# 28 passed
 ```
  
-Evidencia para la entrega. Los lineamientos piden "Resultados de pruebas: evidencia de ejecución y explicación de los casos cubiertos". Se entrega la salida completa de `python -m pytest -v` junto con las tablas anteriores, que explican qué caso cubre cada prueba. Si una prueba falla, pytest muestra qué esperaba y qué obtuvo (por ejemplo, `assert 7 == 5`): se lee el fallo, se corrige el código y se vuelve a ejecutar hasta obtener `23 passed`.
+Evidencia para la entrega. Los lineamientos piden "Resultados de pruebas: evidencia de ejecución y explicación de los casos cubiertos". Se entrega la salida completa de `python -m pytest -v` junto con las tablas anteriores, que explican qué caso cubre cada prueba. Si una prueba falla, pytest muestra qué esperaba y qué obtuvo (por ejemplo, `assert 7 == 5`): se lee el fallo, se corrige el código y se vuelve a ejecutar hasta obtener `28 passed`.
  
 ## 15. Datos de demostración
  
@@ -599,10 +642,10 @@ proyecto_etapa2/
 │   ├── reporte_general.txt
 │   └── alertas.txt
 ├── tests/
-│   ├── archivos_prueba/       # archivos que preparan las pruebas 18 a 23
-│   ├── test_validaciones.py   # pruebas 1 a 6
+│   ├── archivos_prueba/       # archivos que preparan las pruebas 18 a 23, 27 y 28
+│   ├── test_validaciones.py   # pruebas 1 a 6 y 24 a 26
 │   ├── test_operaciones.py    # pruebas 7 a 17
-│   └── test_archivos.py       # pruebas 18 a 23
+│   └── test_archivos.py       # pruebas 18 a 23, 27 y 28
 └── README.md
 ```
  
