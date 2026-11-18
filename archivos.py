@@ -270,13 +270,10 @@ def escribir_con_respaldo(cambios):
         for i in range(escritos + 1):
             if not restaurar_archivo(cambios[i][0], respaldos[i]):
                 sin_restaurar.append(cambios[i][0])
-        motivo = falla.strerror
-        if motivo is None:
-            motivo = str(falla)
         if len(sin_restaurar) > 0:
-            raise OSError(f"No se pudo escribir {cambios[escritos][0]} ({motivo}) ni restaurar {', '.join(sin_restaurar)}. "
+            raise OSError(f"No se pudo escribir {cambios[escritos][0]} ({falla}) ni restaurar {', '.join(sin_restaurar)}. "
                           "Revisá esos archivos antes de volver a iniciar")
-        raise OSError(f"No se pudo escribir {cambios[escritos][0]} ({motivo}). Se restauraron los archivos y no se guardó ningún cambio")
+        raise OSError(f"No se pudo escribir {cambios[escritos][0]} ({falla}). Se restauraron los archivos y no se guardó ningún cambio")
 
 
 def guardar_partidos(ruta, partidos):
@@ -341,7 +338,7 @@ def preparar_archivos(config):
 
     hay_jugados = False
     if existe["partidos"]:
-        partidos, incidencias = leer_partidos(rutas["partidos"], config)
+        partidos = leer_partidos(rutas["partidos"], config)[0]
         hay_jugados = operaciones.hay_partidos_jugados(partidos)
 
     situacion = verificar_combinacion_archivos(existe["equipos"], existe["jugadores"], existe["partidos"],
